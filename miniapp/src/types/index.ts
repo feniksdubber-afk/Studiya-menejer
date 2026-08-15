@@ -34,6 +34,11 @@ export interface Project {
   is_archived: boolean;
   created_by: string;
   created_at: string;
+  // Joriy foydalanuvchi AYNAN shu loyihada boshqarish huquqiga egami
+  // (admin/super_admin yoki shu loyihaning director_main/director_extra
+  // a'zosi). Global user.role emas — backend har bir loyiha uchun
+  // alohida hisoblab qaytaradi.
+  can_manage: boolean;
 }
 
 export type ProjectRole =
@@ -89,6 +94,7 @@ export interface Character {
   created_by: string;
   created_at: string;
   display_image_url: string | null;
+  can_manage: boolean;
 }
 
 export interface CastMemberUser {
@@ -123,6 +129,9 @@ export interface Task {
   revision_reason: string | null;
   created_at: string;
   updated_at: string;
+  // Joriy foydalanuvchi shu vazifani qabul qilishi/qayta ishlashga
+  // qaytarishi mumkinmi (admin yoki shu loyihaning rejissyori).
+  can_manage: boolean;
 }
 
 export interface DeadlineHistory {

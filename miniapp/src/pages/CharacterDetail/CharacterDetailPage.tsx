@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import axios from "axios";
 import {
   addCharacterCast,
   deleteCharacterImage,
@@ -184,7 +185,11 @@ export default function CharacterDetailPage() {
   // global user.role emas (qarang: ProjectDetailPage.tsx).
   const canManage = character?.can_manage ?? false;
 
-  const { mutate: uploadImage, isPending: isUploadingImage } = useMutation({
+  const {
+    mutate: uploadImage,
+    isPending: isUploadingImage,
+    error: uploadError,
+  } = useMutation({
     mutationFn: (file: File) => uploadCharacterImage(characterId!, file),
     onSuccess: (updated) => {
       queryClient.setQueryData(["character", characterId], updated);
@@ -277,6 +282,14 @@ export default function CharacterDetailPage() {
           </div>
         )}
       </div>
+
+      {uploadError && (
+        <div className="mx-5 -mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {axios.isAxiosError(uploadError) && uploadError.response?.data?.detail
+            ? String(uploadError.response.data.detail)
+            : "Rasmni yuklab bo'lmadi. Qaytadan urinib ko'ring."}
+        </div>
+      )}
 
       <div className="flex flex-col gap-5 px-5">
         {!character.is_active && (

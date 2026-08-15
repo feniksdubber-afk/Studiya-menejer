@@ -4,14 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { createProject, listProjects } from "@/api/projects";
 import { searchAniList, type AniListSearchResult } from "@/api/anilist";
 import { useAuth } from "@/auth/useAuth";
+import { Sparkles, Tv, Clapperboard, Ghost, Film, Plus, X } from "lucide-react";
 import type { ProjectType } from "@/types";
 
-const TYPE_ICON: Record<string, string> = {
-  anime: "🎌",
-  series: "📺",
-  movie: "🎬",
-  cartoon: "🧸",
-  other: "🎞",
+const TYPE_ICON: Record<string, typeof Sparkles> = {
+  anime: Sparkles,
+  series: Tv,
+  movie: Clapperboard,
+  cartoon: Ghost,
+  other: Film,
 };
 
 const TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
@@ -131,9 +132,17 @@ export default function ProjectsPage() {
                 setIsFormOpen(true);
               }
             }}
-            className="rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
+            className="flex items-center gap-1 rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
           >
-            {isFormOpen ? "Bekor qilish" : "+ Yangi loyiha"}
+            {isFormOpen ? (
+              <>
+                <X size={14} aria-hidden="true" /> Bekor qilish
+              </>
+            ) : (
+              <>
+                <Plus size={14} aria-hidden="true" /> Yangi loyiha
+              </>
+            )}
           </button>
         )}
       </div>
@@ -169,8 +178,8 @@ export default function ProjectsPage() {
                         className="h-12 w-9 rounded-md object-cover"
                       />
                     ) : (
-                      <div className="flex h-12 w-9 items-center justify-center rounded-md bg-black/10 text-lg">
-                        🎞
+                      <div className="flex h-12 w-9 items-center justify-center rounded-md bg-black/10">
+                        <Film size={16} className="text-tg-hint" aria-hidden="true" />
                       </div>
                     )}
                     <div className="flex flex-col">
@@ -184,7 +193,7 @@ export default function ProjectsPage() {
               </div>
             )}
             {anilistId !== null && (
-              <p className="text-xs text-tg-hint">✅ AniList'dan tanlandi (ID: {anilistId})</p>
+              <p className="font-mono text-xs text-tg-hint">AniList'dan tanlandi (ID: {anilistId})</p>
             )}
           </div>
 
@@ -202,20 +211,23 @@ export default function ProjectsPage() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-tg-hint">Turi</label>
             <div className="flex flex-wrap gap-2">
-              {TYPE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setType(option.value)}
-                  className={`rounded-xl px-3 py-1.5 text-sm ${
-                    type === option.value
-                      ? "bg-tg-button text-tg-buttonText"
-                      : "bg-tg-bg text-tg-text"
-                  }`}
-                >
-                  {TYPE_ICON[option.value]} {option.label}
-                </button>
-              ))}
+              {TYPE_OPTIONS.map((option) => {
+                const Icon = TYPE_ICON[option.value];
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setType(option.value)}
+                    className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm ${
+                      type === option.value
+                        ? "bg-tg-button text-tg-buttonText"
+                        : "bg-tg-bg text-tg-text"
+                    }`}
+                  >
+                    <Icon size={14} aria-hidden="true" /> {option.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -246,26 +258,29 @@ export default function ProjectsPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        {projects?.map((project) => (
-          <button
-            key={project.id}
-            onClick={() => navigate(`/projects/${project.id}`)}
-            className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3 text-left"
-          >
-            <div className="flex aspect-[2/3] items-center justify-center rounded-xl bg-black/5 text-3xl">
-              {project.poster_url ? (
-                <img
-                  src={project.poster_url}
-                  alt={project.title}
-                  className="h-full w-full rounded-xl object-cover"
-                />
-              ) : (
-                TYPE_ICON[project.type] ?? "🎞"
-              )}
-            </div>
-            <span className="line-clamp-2 text-sm font-medium text-tg-text">{project.title}</span>
-          </button>
-        ))}
+        {projects?.map((project) => {
+          const TypeIcon = TYPE_ICON[project.type] ?? Film;
+          return (
+            <button
+              key={project.id}
+              onClick={() => navigate(`/projects/${project.id}`)}
+              className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3 text-left"
+            >
+              <div className="flex aspect-[2/3] items-center justify-center rounded-xl bg-black/5">
+                {project.poster_url ? (
+                  <img
+                    src={project.poster_url}
+                    alt={project.title}
+                    className="h-full w-full rounded-xl object-cover"
+                  />
+                ) : (
+                  <TypeIcon size={28} className="text-tg-hint" aria-hidden="true" />
+                )}
+              </div>
+              <span className="line-clamp-2 text-sm font-medium text-tg-text">{project.title}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

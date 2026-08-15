@@ -2,8 +2,13 @@ import axios, { type AxiosError } from "axios";
 
 // Prod'da Caddy /api/* ni FastAPI'ga proxy qiladi (deploy/Caddyfile).
 // Dev'da vite.config.ts shu prefixni backendga proxy qiladi.
+// Standart timeout — osilib qolgan so'rovlar foydalanuvchini abadiy
+// "Yuklanmoqda..." holatida ushlab turmasligi uchun. Uzoqroq davom
+// etadigan alohida so'rovlar (masalan AniList personajlarini import
+// qilish) buni request config'da o'zi override qiladi.
 export const apiClient = axios.create({
   baseURL: "/api",
+  timeout: 20_000,
 });
 
 const TOKEN_STORAGE_KEY = "afsona_dub_jwt";

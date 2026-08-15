@@ -26,6 +26,10 @@ export async function searchAniList(query: string): Promise<AniListSearchResult[
 }
 
 export async function getAniListCharacters(anilistId: number): Promise<AniListCharacter[]> {
-  const { data } = await apiClient.get<AniListCharacter[]>(`/anilist/${anilistId}/characters`);
+  // Katta anime (yuzlab personaj) bir necha AniList sahifasini ketma-ket
+  // so'rashi mumkin — standart 20s timeout yetmasligi mumkin.
+  const { data } = await apiClient.get<AniListCharacter[]>(`/anilist/${anilistId}/characters`, {
+    timeout: 45_000,
+  });
   return data;
 }

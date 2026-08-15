@@ -8,7 +8,11 @@ import {
   listSeasons,
   listEpisodes,
   createSeason,
+  updateSeason,
+  deleteSeason,
   createEpisode,
+  updateEpisode,
+  deleteEpisode,
   addProjectMember,
   removeProjectMember,
 } from "@/api/projects";
@@ -19,8 +23,8 @@ import { QueryError } from "@/components/StatusScreens";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
-import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film } from "lucide-react";
-import type { ProjectMember, ProjectRole, Season, User } from "@/types";
+import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X } from "lucide-react";
+import type { Episode, ProjectMember, ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
 type RoleCategory = "director" | "translator" | "voice_actor" | "sound";
@@ -54,11 +58,135 @@ const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = (
   Object.keys(ROLE_META) as ProjectRole[]
 ).map((value) => ({ value, label: ROLE_META[value].label }));
 
-function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean }) {
+function EpisodeRow({
+  episode,
+  canManage,
+}: {
+  episode: Episode;
+  canManage: boolean;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(episode.title);
+
+  const { mutate: rename, isPending: isRenaming } = useMutation({
+    mutationFn: () => updateEpisode(episode.id, { title: title.trim() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["episodes", episode.season_id] });
+      setIsEditing(false);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Qism nomini o'zgartirib bo'lmadi.");
+    },
+  });
+
+  const { mutate: remove, isPending: isDeleting } = useMutation({
+    mutationFn: () => deleteEpisode(episode.id),
+    onSuccess: () => {
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Qism o'chirildi.");
+      queryClient.invalidateQueries({ queryKey: ["episodes", episode.season_id] });
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Qismni o'chirib bo'lmadi.");
+    },
+  });
+
+  function handleDelete() {
+    WebApp.showConfirm(`"${episode.title}" qismini o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`, (ok) => {
+      if (ok) remove();
+    });
+  }
+
+  function handleSaveRename(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || title.trim() === episode.title) {
+      setIsEditing(false);
+      setTitle(episode.title);
+      return;
+    }
+    rename();
+  }
+
+  if (isEditing) {
+    return (
+      <form onSubmit={handleSaveRename} className="flex items-center gap-1.5 rounded-xl bg-tg-secondaryBg px-2 py-1.5">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="flex-1 rounded-lg bg-tg-bg px-2 py-1 text-sm text-tg-text outline-none"
+        />
+        <button
+          type="submit"
+          disabled={isRenaming}
+          aria-label="Saqlash"
+          className="shrink-0 rounded-full p-1 text-role-sound-800 active:bg-tg-bg disabled:opacity-40"
+        >
+          <Check size={15} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setIsEditing(false);
+            setTitle(episode.title);
+          }}
+          aria-label="Bekor qilish"
+          className="shrink-0 rounded-full p-1 text-tg-hint active:bg-tg-bg"
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 rounded-xl bg-tg-secondaryBg px-1 py-1">
+      <button
+        onClick={() => navigate(`/episodes/${episode.id}`)}
+        className="flex flex-1 items-center justify-between gap-2 px-2 py-1 text-left text-sm text-tg-text"
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          <Film size={14} className="shrink-0 text-tg-hint" aria-hidden="true" /> {episode.title}
+        </span>
+        <span className="shrink-0 font-mono text-xs text-tg-hint">{episode.status}</span>
+      </button>
+      {canManage && (
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            aria-label="Qism nomini o'zgartirish"
+            className="rounded-full p-1.5 text-tg-hint active:bg-tg-bg"
+          >
+            <Pencil size={13} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            aria-label="Qismni o'chirish"
+            className="rounded-full p-1.5 text-tg-hint active:bg-tg-bg disabled:opacity-40"
+          >
+            <Trash2 size={13} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean }) {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [isAddingEpisode, setIsAddingEpisode] = useState(false);
   const [episodeTitle, setEpisodeTitle] = useState("");
+  const [isEditingSeason, setIsEditingSeason] = useState(false);
+  const [seasonTitle, setSeasonTitle] = useState(season.title);
 
   const { data: episodes } = useQuery({
     queryKey: ["episodes", season.id],
@@ -75,29 +203,121 @@ function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean
     },
   });
 
+  const { mutate: renameSeason, isPending: isRenamingSeason } = useMutation({
+    mutationFn: () => updateSeason(season.id, { title: seasonTitle.trim() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seasons", season.project_id] });
+      setIsEditingSeason(false);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Sezon nomini o'zgartirib bo'lmadi.");
+    },
+  });
+
+  const { mutate: removeSeason, isPending: isDeletingSeason } = useMutation({
+    mutationFn: () => deleteSeason(season.id),
+    onSuccess: () => {
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Sezon o'chirildi.");
+      queryClient.invalidateQueries({ queryKey: ["seasons", season.project_id] });
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Sezonni o'chirib bo'lmadi.");
+    },
+  });
+
   function handleAddEpisode(e: FormEvent) {
     e.preventDefault();
     if (!episodeTitle.trim()) return;
     submitEpisode();
   }
 
+  function handleSaveSeasonRename(e: FormEvent) {
+    e.preventDefault();
+    if (!seasonTitle.trim() || seasonTitle.trim() === season.title) {
+      setIsEditingSeason(false);
+      setSeasonTitle(season.title);
+      return;
+    }
+    renameSeason();
+  }
+
+  function handleDeleteSeason() {
+    // Sezonni o'chirish barcha qismlarini ham o'chiradi (CASCADE, qarang:
+    // api/routers/projects.py:delete_season) — shuning uchun oddiy
+    // haptic-only tasdiqlash yetarli emas, ochiq matnli tasdiq talab qilinadi.
+    WebApp.showConfirm(
+      `"${season.title}" sezonini butun qismlari bilan o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`,
+      (ok) => {
+        if (ok) removeSeason();
+      }
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <p className="flex items-center gap-1.5 text-sm font-medium text-tg-text">
-        <Folder size={15} className="text-tg-hint" aria-hidden="true" /> {season.title}
-      </p>
+      {isEditingSeason ? (
+        <form onSubmit={handleSaveSeasonRename} className="flex items-center gap-1.5">
+          <Folder size={15} className="shrink-0 text-tg-hint" aria-hidden="true" />
+          <input
+            value={seasonTitle}
+            onChange={(e) => setSeasonTitle(e.target.value)}
+            autoFocus
+            className="flex-1 rounded-lg bg-tg-secondaryBg px-2 py-1 text-sm text-tg-text outline-none"
+          />
+          <button
+            type="submit"
+            disabled={isRenamingSeason}
+            aria-label="Saqlash"
+            className="shrink-0 rounded-full p-1 text-role-sound-800 active:bg-tg-secondaryBg disabled:opacity-40"
+          >
+            <Check size={15} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditingSeason(false);
+              setSeasonTitle(season.title);
+            }}
+            aria-label="Bekor qilish"
+            className="shrink-0 rounded-full p-1 text-tg-hint active:bg-tg-secondaryBg"
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        </form>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <p className="flex flex-1 items-center gap-1.5 truncate text-sm font-medium text-tg-text">
+            <Folder size={15} className="shrink-0 text-tg-hint" aria-hidden="true" /> {season.title}
+          </p>
+          {canManage && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setIsEditingSeason(true)}
+                aria-label="Sezon nomini o'zgartirish"
+                className="rounded-full p-1.5 text-tg-hint active:bg-tg-secondaryBg"
+              >
+                <Pencil size={13} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSeason}
+                disabled={isDeletingSeason}
+                aria-label="Sezonni o'chirish"
+                className="rounded-full p-1.5 text-tg-hint active:bg-tg-secondaryBg disabled:opacity-40"
+              >
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-1 pl-4">
         {episodes?.map((ep) => (
-          <button
-            key={ep.id}
-            onClick={() => navigate(`/episodes/${ep.id}`)}
-            className="flex items-center justify-between rounded-xl bg-tg-secondaryBg px-3 py-2 text-left text-sm text-tg-text"
-          >
-            <span className="flex items-center gap-1.5">
-              <Film size={14} className="text-tg-hint" aria-hidden="true" /> {ep.title}
-            </span>
-            <span className="font-mono text-xs text-tg-hint">{ep.status}</span>
-          </button>
+          <EpisodeRow key={ep.id} episode={ep} canManage={canManage} />
         ))}
 
         {canManage && (

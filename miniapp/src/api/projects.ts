@@ -25,6 +25,31 @@ export async function getProject(projectId: string): Promise<Project> {
   return data;
 }
 
+export interface ProjectUpdatePayload {
+  title?: string;
+  type?: ProjectType;
+  poster_url?: string | null;
+  anilist_id?: number | null;
+}
+
+export async function updateProject(
+  projectId: string,
+  payload: ProjectUpdatePayload
+): Promise<Project> {
+  const { data } = await apiClient.patch<Project>(`/projects/${projectId}`, payload);
+  return data;
+}
+
+export async function archiveProject(projectId: string): Promise<Project> {
+  const { data } = await apiClient.post<Project>(`/projects/${projectId}/archive`);
+  return data;
+}
+
+export async function unarchiveProject(projectId: string): Promise<Project> {
+  const { data } = await apiClient.post<Project>(`/projects/${projectId}/unarchive`);
+  return data;
+}
+
 export async function listProjectMembers(projectId: string): Promise<ProjectMember[]> {
   const { data } = await apiClient.get<ProjectMember[]>(`/projects/${projectId}/members`);
   return data;

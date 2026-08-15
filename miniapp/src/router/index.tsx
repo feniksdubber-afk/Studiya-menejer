@@ -8,10 +8,13 @@ import EpisodeDetailPage from "@/pages/EpisodeDetail/EpisodeDetailPage";
 import CharacterDetailPage from "@/pages/CharacterDetail/CharacterDetailPage";
 import TaskDetailPage from "@/pages/TaskDetail/TaskDetailPage";
 import ProfilePage from "@/pages/Profile/ProfilePage";
+import { RouteErrorBoundary } from "@/components/StatusScreens";
+import { NotFoundPage } from "@/pages/NotFound/NotFoundPage";
 
 export const router = createBrowserRouter([
   {
     element: <AppLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "/", element: <HomePage /> },
       { path: "/tasks", element: <MyTasksPage /> },
@@ -21,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "/episodes/:episodeId", element: <EpisodeDetailPage /> },
       { path: "/characters/:characterId", element: <CharacterDetailPage /> },
       { path: "/profile", element: <ProfilePage /> },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);

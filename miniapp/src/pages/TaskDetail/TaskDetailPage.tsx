@@ -2,9 +2,11 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
+import { Upload, CheckCircle2, RotateCcw, History } from "lucide-react";
 import { getDeadlineHistory, getTask, requestRevision, setTaskStatus } from "@/api/tasks";
 import { getPublicConfig } from "@/api/config";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
+import { DeadlineRing } from "@/components/DeadlineRing";
 import { useAuth } from "@/auth/useAuth";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
@@ -76,7 +78,7 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
         <button
           type="submit"
           disabled={!reason.trim() || isPending}
-          className="flex-[2] rounded-xl bg-orange-500 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          className="flex-[2] rounded-xl bg-role-director-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? "Yuborilmoqda..." : "Qayta ishlashga qaytarish"}
         </button>
@@ -95,7 +97,9 @@ function DeadlineHistorySection({ taskId }: { taskId: string }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-tg-hint">🕓 Deadline tarixi</h2>
+      <h2 className="flex items-center gap-1.5 text-sm font-medium text-tg-hint">
+        <History size={14} aria-hidden="true" /> Deadline tarixi
+      </h2>
       <div className="flex flex-col gap-2">
         {history.map((h) => (
           <div key={h.id} className="rounded-2xl bg-tg-secondaryBg p-3 text-xs text-tg-text">
@@ -171,21 +175,28 @@ export default function TaskDetailPage() {
         <TaskStatusBadge status={task.status} />
       </div>
 
-      <dl className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-4 text-sm">
-        {task.deadline && (
-          <div className="flex justify-between">
-            <dt className="text-tg-hint">Deadline</dt>
-            <dd className="text-tg-text">{new Date(task.deadline).toLocaleString("uz-UZ")}</dd>
-          </div>
+      <div className="flex items-center gap-4 rounded-2xl bg-tg-secondaryBg p-4">
+        {task.deadline && (task.status === "pending" || task.status === "revision_requested") && (
+          <DeadlineRing deadline={task.deadline} />
         )}
-        <div className="flex justify-between">
-          <dt className="text-tg-hint">Versiya</dt>
-          <dd className="text-tg-text">v{task.current_version}</dd>
-        </div>
-      </dl>
+        <dl className="flex flex-1 flex-col gap-2 text-sm">
+          {task.deadline && (
+            <div className="flex justify-between">
+              <dt className="text-tg-hint">Deadline</dt>
+              <dd className="font-mono text-tg-text">
+                {new Date(task.deadline).toLocaleString("uz-UZ")}
+              </dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt className="text-tg-hint">Versiya</dt>
+            <dd className="font-mono text-tg-text">v{task.current_version}</dd>
+          </div>
+        </dl>
+      </div>
 
       {task.status === "revision_requested" && task.revision_reason && (
-        <div className="rounded-2xl bg-orange-50 p-4 text-sm text-orange-800">
+        <div className="rounded-2xl bg-role-director-50 p-4 text-sm text-role-director-800">
           <p className="font-medium">Qayta topshirish sababi:</p>
           <p className="mt-1">{task.revision_reason}</p>
         </div>
@@ -195,9 +206,9 @@ export default function TaskDetailPage() {
         <button
           onClick={openSubmissionInBot}
           disabled={!config?.bot_username}
-          className="rounded-xl bg-tg-button px-4 py-3 text-sm font-medium text-tg-buttonText disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-xl bg-tg-button px-4 py-3 text-sm font-medium text-tg-buttonText disabled:opacity-50"
         >
-          📤 Fayl topshirish
+          <Upload size={16} aria-hidden="true" /> Fayl topshirish
         </button>
       )}
 
@@ -207,17 +218,17 @@ export default function TaskDetailPage() {
             <button
               onClick={() => acceptMutation.mutate()}
               disabled={acceptMutation.isPending}
-              className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-role-sound-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
             >
-              ✅ Qabul qilish
+              <CheckCircle2 size={16} aria-hidden="true" /> Qabul qilish
             </button>
           )}
           {canReject && (
             <button
               onClick={() => setIsRejecting(true)}
-              className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-white"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-role-director-600 px-4 py-3 text-sm font-medium text-white"
             >
-              🔄 Qaytarish
+              <RotateCcw size={16} aria-hidden="true" /> Qaytarish
             </button>
           )}
         </div>

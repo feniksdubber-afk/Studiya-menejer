@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import get_db
 from models.projects import Episode, Project, ProjectMember, ProjectRole, Season
-from models.users import User, UserRole
+from models.users import DirectorStatus, User, UserRole
 from routers.auth import require_admin, require_registered_user
 from schemas.auth import UserBrief
 from schemas.projects import (
@@ -47,11 +47,25 @@ async def create_project(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_registered_user),
 ):
-    """Loyiha yaratish — faqat rejissyor (role=director) yoki admin."""
-    if not (user.role == UserRole.director or user.is_admin or user.is_super_admin):
+    """Loyiha yaratish — faqat rejissyor (role=director) yoki admin.
+
+    MUHIM: role=director bo'lishning o'zi yetarli emas — bot orqali
+    ro'yxatdan o'tayotganda foydalanuvchi shu rolni o'zi tanlaydi va
+    is_registered darhol True bo'ladi (admin tasdig'ini kutmasdan,
+    qarang: bot/handlers/registration.py). Haqiqiy director huquqi faqat
+    admin `director_status`ni "approved" qilgandan keyin (director_approved)
+    beriladi. Shu tekshiruvsiz istalgan foydalanuvchi "Rejissyor" rolini
+    tanlab, admin tasdig'isiz darhol loyiha yaratishi mumkin bo'lardi.
+    """
+    is_approved_director = (
+        user.role == UserRole.director
+        and user.director_status == DirectorStatus.approved
+        and user.director_approved
+    )
+    if not (is_approved_director or user.is_admin or user.is_super_admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Faqat rejissyor yoki admin loyiha yarata oladi",
+            detail="Faqat admin tomonidan tasdiqlangan rejissyor yoki admin loyiha yarata oladi",
         )
 
     project = Project(

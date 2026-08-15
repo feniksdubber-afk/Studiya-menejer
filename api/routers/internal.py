@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import require_internal_service
 from db.session import get_db
+from models.projects import Episode, ProjectMember, ProjectRole, Season
 from schemas.files import FileOut, FileSubmitResult, FileVersionOut, InternalFileSubmit
+from schemas.tasks import OverdueMarkResult
 from services.file_service import submit_file
+from services.notification_dispatcher import notify
+from services.task_engine import mark_overdue_tasks_delayed
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -33,4 +38,55 @@ async def internal_submit_file(
         version=FileVersionOut.model_validate(version),
         task_status="submitted",
         task_current_version=version.version_number,
+    )
+
+
+@router.post(
+    "/tasks/mark-overdue",
+    response_model=OverdueMarkResult,
+    dependencies=[Depends(require_internal_service)],
+)
+async def internal_mark_overdue_tasks(db: AsyncSession = Depends(get_db)):
+    """Faqat bot scheduleri chaqiradi (bot/services/deadline_notifier.py),
+    xuddi /internal/files kabi `X-Internal-Api-Key` bilan himoyalangan.
+
+    Deadline'i o'tib ketgan, hali yakunlanmagan tasklarni 'delayed'ga
+    o'tkazadi (services/task_engine.mark_overdue_tasks_delayed — biznes
+    logikaning yagona manbai) va tayinlangan ijrochi + loyiha
+    rejissyorlariga in-app bildirishnoma yaratadi. Telegram push xabarini
+    bot o'zi javobdagi task_id'lar asosida alohida yuboradi (chat_id kabi
+    Telegram-specific narsalar API'da emas, bot tomonda saqlanadi).
+    """
+    changed_tasks = await mark_overdue_tasks_delayed(db)
+
+    for task in changed_tasks:
+        await notify(
+            db,
+            user_id=task.assigned_to,
+            type_="task_delayed",
+            payload={"task_id": str(task.id), "episode_id": str(task.episode_id)},
+        )
+
+        episode = await db.get(Episode, task.episode_id)
+        season = await db.get(Season, episode.season_id) if episode else None
+        if season is not None:
+            directors = await db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == season.project_id,
+                    ProjectMember.role_in_project.in_(
+                        [ProjectRole.director_main, ProjectRole.director_extra]
+                    ),
+                )
+            )
+            for director in directors.scalars().all():
+                await notify(
+                    db,
+                    user_id=director.user_id,
+                    type_="task_delayed",
+                    payload={"task_id": str(task.id), "episode_id": str(task.episode_id)},
+                )
+
+    return OverdueMarkResult(
+        marked_count=len(changed_tasks),
+        task_ids=[t.id for t in changed_tasks],
     )

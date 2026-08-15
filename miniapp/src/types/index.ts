@@ -1,1 +1,124 @@
+// Backend api/schemas/*.py bilan bir xil shaklda ushlab turiladi.
+// Enum qiymatlari backend models/*.py dagi ENUM'lar bilan so'zma-so'z mos bo'lishi shart.
 
+export type UserRole = "director" | "translator" | "voice_actor" | "sound_editor";
+export type DirectorStatus = "none" | "pending" | "approved" | "rejected";
+
+export interface User {
+  id: string;
+  telegram_id: number;
+  first_name: string;
+  last_name: string | null;
+  telegram_username: string | null;
+  role: UserRole | null;
+  director_status: DirectorStatus;
+  is_admin: boolean;
+  is_super_admin: boolean;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  is_new_user: boolean;
+  user: User;
+}
+
+export type ProjectType = "anime" | "series" | "movie" | "cartoon" | "other";
+
+export interface Project {
+  id: string;
+  title: string;
+  type: ProjectType;
+  poster_url: string | null;
+  anilist_id: number | null;
+  is_archived: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export type ProjectRole =
+  | "director_main"
+  | "director_extra"
+  | "translator_main"
+  | "translator_extra"
+  | "sound_main"
+  | "sound_extra";
+
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role_in_project: ProjectRole;
+  added_at: string;
+}
+
+export interface Season {
+  id: string;
+  project_id: string;
+  title: string;
+  order_index: number;
+  anilist_season_id: number | null;
+}
+
+export type EpisodeStatus = "not_started" | "in_progress" | "revision" | "ready" | "delayed";
+
+export interface Episode {
+  id: string;
+  season_id: string;
+  title: string;
+  order_index: number;
+  status: EpisodeStatus;
+  created_at: string;
+}
+
+export type ImageSource = "anilist" | "custom";
+export type CastType = "main" | "alternate";
+
+export interface Character {
+  id: string;
+  project_id: string;
+  name: string;
+  anilist_original_name: string | null;
+  anilist_image_url: string | null;
+  custom_image_key: string | null;
+  image_source: ImageSource;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  display_image_url: string | null;
+}
+
+export interface CharacterCast {
+  id: string;
+  character_id: string;
+  user_id: string;
+  cast_type: CastType;
+}
+
+export type TaskType = "translation" | "voice" | "sound_video" | "sound_audio";
+export type TaskStatus = "pending" | "submitted" | "revision_requested" | "accepted" | "delayed";
+
+export interface Task {
+  id: string;
+  episode_id: string;
+  task_type: TaskType;
+  character_id: string | null;
+  assigned_to: string;
+  assigned_by: string | null;
+  assigned_at: string;
+  status: TaskStatus;
+  current_version: number;
+  deadline: string | null;
+  revision_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeadlineHistory {
+  id: string;
+  task_id: string;
+  old_deadline: string | null;
+  new_deadline: string | null;
+  reason: string | null;
+  changed_at: string;
+}

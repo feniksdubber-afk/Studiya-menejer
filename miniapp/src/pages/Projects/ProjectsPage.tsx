@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { createProject, listProjects } from "@/api/projects";
+import { searchAniList, type AniListSearchResult } from "@/api/anilist";
 import { useAuth } from "@/auth/useAuth";
 import type { ProjectType } from "@/types";
 
@@ -21,6 +22,8 @@ const TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
   { value: "other", label: "Boshqa" },
 ];
 
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -31,7 +34,12 @@ export default function ProjectsPage() {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<ProjectType>("anime");
   const [posterUrl, setPosterUrl] = useState("");
+  const [anilistId, setAnilistId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<AniListSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const { data: projects, isLoading, isError } = useQuery({
     queryKey: ["projects"],
@@ -44,20 +52,59 @@ export default function ProjectsPage() {
         title: title.trim(),
         type,
         poster_url: posterUrl.trim() || null,
+        anilist_id: anilistId,
       }),
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setIsFormOpen(false);
-      setTitle("");
-      setType("anime");
-      setPosterUrl("");
-      setError(null);
+      resetForm();
       navigate(`/projects/${project.id}`);
     },
     onError: () => {
       setError("Loyihani yaratib bo'lmadi. Qaytadan urinib ko'ring.");
     },
   });
+
+  function resetForm() {
+    setIsFormOpen(false);
+    setTitle("");
+    setType("anime");
+    setPosterUrl("");
+    setAnilistId(null);
+    setError(null);
+    setSearchQuery("");
+    setSearchResults([]);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchQuery(value);
+    setAnilistId(null);
+    clearTimeout(searchDebounceTimer);
+
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    searchDebounceTimer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchAniList(value.trim());
+        setSearchResults(results);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  }
+
+  function handleSelectAniList(result: AniListSearchResult) {
+    setTitle(result.title);
+    setPosterUrl(result.poster_url ?? "");
+    setAnilistId(result.anilist_id);
+    setSearchQuery(result.title);
+    setSearchResults([]);
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -78,8 +125,11 @@ export default function ProjectsPage() {
         {canCreate && (
           <button
             onClick={() => {
-              setIsFormOpen((open) => !open);
-              setError(null);
+              if (isFormOpen) {
+                resetForm();
+              } else {
+                setIsFormOpen(true);
+              }
             }}
             className="rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
           >
@@ -94,6 +144,51 @@ export default function ProjectsPage() {
           className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4"
         >
           <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-tg-hint">AniList'dan qidirish (ixtiyoriy)</label>
+            <input
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Masalan: Naruto"
+              className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+              autoFocus
+            />
+            {isSearching && <p className="text-xs text-tg-hint">Qidirilmoqda...</p>}
+            {searchResults.length > 0 && (
+              <div className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-xl bg-tg-bg p-1.5">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.anilist_id}
+                    type="button"
+                    onClick={() => handleSelectAniList(result)}
+                    className="flex items-center gap-2 rounded-lg p-1.5 text-left hover:bg-tg-secondaryBg"
+                  >
+                    {result.poster_url ? (
+                      <img
+                        src={result.poster_url}
+                        alt={result.title}
+                        className="h-12 w-9 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-9 items-center justify-center rounded-md bg-black/10 text-lg">
+                        🎞
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-sm text-tg-text">{result.title}</span>
+                      <span className="text-xs text-tg-hint">
+                        {[result.format, result.year].filter(Boolean).join(" · ")}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {anilistId !== null && (
+              <p className="text-xs text-tg-hint">✅ AniList'dan tanlandi (ID: {anilistId})</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs text-tg-hint">Loyiha nomi</label>
             <input
               value={title}
@@ -101,7 +196,6 @@ export default function ProjectsPage() {
               placeholder="Masalan: Naruto"
               className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
               maxLength={256}
-              autoFocus
             />
           </div>
 

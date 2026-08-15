@@ -102,6 +102,10 @@ async def _notify_one(db, bot: Bot, task: Task) -> None:
             "episode_id": str(episode.id),
             "project_id": str(project.id) if project else None,
         },
+        # Telegram xabari yuqorida shu funksiya ichida darhol yuborildi,
+        # shuning uchun umumiy push navbatchisi (notification_pusher.py)
+        # buni qayta yubormasligi uchun darhol "pushed" deb belgilanadi.
+        pushed_at=now,
     )
     db.add(notification)
 

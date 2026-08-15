@@ -52,4 +52,4 @@ class DeadlineHistory(Base):
     old_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     new_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reason: Mapped[str | None] = mapped_column(Text)
-    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

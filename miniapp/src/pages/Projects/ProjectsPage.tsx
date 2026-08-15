@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
+import axios from "axios";
 import { createProject, listProjects } from "@/api/projects";
 import { searchAniList, type AniListSearchResult } from "@/api/anilist";
 import { useAuth } from "@/auth/useAuth";
@@ -48,6 +49,7 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AniListSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const {
     data: projects,
@@ -90,11 +92,13 @@ export default function ProjectsPage() {
     setError(null);
     setSearchQuery("");
     setSearchResults([]);
+    setSearchError(null);
   }
 
   function handleSearchChange(value: string) {
     setSearchQuery(value);
     setAnilistId(null);
+    setSearchError(null);
     clearTimeout(searchDebounceTimer.current);
 
     if (value.trim().length < 2) {
@@ -104,11 +108,28 @@ export default function ProjectsPage() {
 
     searchDebounceTimer.current = setTimeout(async () => {
       setIsSearching(true);
+      setSearchError(null);
       try {
         const results = await searchAniList(value.trim());
         setSearchResults(results);
-      } catch {
+        if (results.length === 0) {
+          setSearchError("Hech narsa topilmadi.");
+        }
+      } catch (err) {
         setSearchResults([]);
+        if (axios.isAxiosError(err)) {
+          if (err.response?.status === 502) {
+            setSearchError("AniList bilan bog'lanib bo'lmadi. Birozdan so'ng qaytadan urinib ko'ring.");
+          } else if (err.response?.status === 401) {
+            setSearchError("Sessiya muddati tugagan. Ilovani qayta oching.");
+          } else if (err.code === "ECONNABORTED" || !err.response) {
+            setSearchError("Tarmoq xatosi. Internet aloqasini tekshiring.");
+          } else {
+            setSearchError("Qidiruvda xatolik yuz berdi.");
+          }
+        } else {
+          setSearchError("Qidiruvda xatolik yuz berdi.");
+        }
       } finally {
         setIsSearching(false);
       }
@@ -121,6 +142,7 @@ export default function ProjectsPage() {
     setAnilistId(result.anilist_id);
     setSearchQuery(result.title);
     setSearchResults([]);
+    setSearchError(null);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -185,6 +207,9 @@ export default function ProjectsPage() {
               autoFocus
             />
             {isSearching && <p className="text-xs text-tg-hint">Qidirilmoqda...</p>}
+            {!isSearching && searchError && (
+              <p className="text-xs text-role-voice-800 dark:text-role-voice-400">{searchError}</p>
+            )}
             {searchResults.length > 0 && (
               <div className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-xl bg-tg-bg p-1.5">
                 {searchResults.map((result) => (

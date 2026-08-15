@@ -1,20 +1,58 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { getProject, listProjectMembers, listSeasons, listEpisodes } from "@/api/projects";
+import {
+  getProject,
+  listProjectMembers,
+  listSeasons,
+  listEpisodes,
+  createSeason,
+  createEpisode,
+  addProjectMember,
+} from "@/api/projects";
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
+import { searchUsers } from "@/api/users";
 import { useAuth } from "@/auth/useAuth";
-import type { Season } from "@/types";
+import type { ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
 
-function SeasonBlock({ season }: { season: Season }) {
+const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = [
+  { value: "director_main", label: "Bosh rejissyor" },
+  { value: "director_extra", label: "Yordamchi rejissyor" },
+  { value: "translator_main", label: "Bosh tarjimon" },
+  { value: "translator_extra", label: "Yordamchi tarjimon" },
+  { value: "sound_main", label: "Bosh ovoz muharriri" },
+  { value: "sound_extra", label: "Yordamchi ovoz muharriri" },
+};
+
+function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isAddingEpisode, setIsAddingEpisode] = useState(false);
+  const [episodeTitle, setEpisodeTitle] = useState("");
+
   const { data: episodes } = useQuery({
     queryKey: ["episodes", season.id],
     queryFn: () => listEpisodes(season.id),
   });
+
+  const { mutate: submitEpisode, isPending } = useMutation({
+    mutationFn: () =>
+      createEpisode(season.id, { title: episodeTitle.trim(), order_index: episodes?.length ?? 0 }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["episodes", season.id] });
+      setEpisodeTitle("");
+      setIsAddingEpisode(false);
+    },
+  });
+
+  function handleAddEpisode(e: FormEvent) {
+    e.preventDefault();
+    if (!episodeTitle.trim()) return;
+    submitEpisode();
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -30,7 +68,195 @@ function SeasonBlock({ season }: { season: Season }) {
             <span className="text-xs text-tg-hint">{ep.status}</span>
           </button>
         ))}
+
+        {canManage && (
+          <div className="pl-0">
+            {isAddingEpisode ? (
+              <form onSubmit={handleAddEpisode} className="flex gap-2 pt-1">
+                <input
+                  value={episodeTitle}
+                  onChange={(e) => setEpisodeTitle(e.target.value)}
+                  placeholder="Qism nomi"
+                  autoFocus
+                  className="flex-1 rounded-lg bg-tg-secondaryBg px-2 py-1.5 text-sm text-tg-text outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-lg bg-tg-button px-2.5 py-1.5 text-xs font-medium text-tg-buttonText disabled:opacity-60"
+                >
+                  {isPending ? "..." : "Qo'shish"}
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => setIsAddingEpisode(true)}
+                className="pt-1 text-xs text-tg-button"
+              >
+                + Qism qo'shish
+              </button>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function AddSeasonForm({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
+  const [title, setTitle] = useState("");
+
+  const { data: seasons } = useQuery({
+    queryKey: ["seasons", projectId],
+    queryFn: () => listSeasons(projectId),
+  });
+
+  const { mutate: submit, isPending } = useMutation({
+    mutationFn: () => createSeason(projectId, { title: title.trim(), order_index: seasons?.length ?? 0 }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seasons", projectId] });
+      setTitle("");
+      setIsOpen(false);
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    submit();
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="self-start rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
+      >
+        + Sezon qo'shish
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2 rounded-2xl bg-tg-secondaryBg p-3">
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Masalan: 1-fasl"
+        autoFocus
+        className="flex-1 rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+      />
+      <button
+        type="submit"
+        disabled={isPending}
+        className="rounded-xl bg-tg-button px-3 py-2 text-sm font-medium text-tg-buttonText disabled:opacity-60"
+      >
+        {isPending ? "..." : "Saqlash"}
+      </button>
+    </form>
+  );
+}
+
+function AddMemberForm({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [role, setRole] = useState<ProjectRole>("translator_main");
+
+  const { mutate: submit, isPending, error } = useMutation({
+    mutationFn: () => addProjectMember(projectId, selectedUser!.id, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members", projectId] });
+      setIsOpen(false);
+      setSelectedUser(null);
+      setQuery("");
+      setResults([]);
+    },
+  });
+
+  async function handleQueryChange(value: string) {
+    setQuery(value);
+    setSelectedUser(null);
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    try {
+      setResults(await searchUsers(value.trim()));
+    } catch {
+      setResults([]);
+    }
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="self-start rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
+      >
+        + A'zo qo'shish
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3">
+      <input
+        value={query}
+        onChange={(e) => handleQueryChange(e.target.value)}
+        placeholder="Ism yoki username bo'yicha qidirish"
+        autoFocus
+        className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+      />
+
+      {results.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {results.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => {
+                setSelectedUser(u);
+                setQuery(`${u.first_name}${u.telegram_username ? " @" + u.telegram_username : ""}`);
+                setResults([]);
+              }}
+              className="rounded-lg px-2 py-1.5 text-left text-sm text-tg-text hover:bg-tg-bg"
+            >
+              {u.first_name} {u.telegram_username ? `@${u.telegram_username}` : ""}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedUser && (
+        <div className="flex flex-wrap gap-2">
+          {ROLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setRole(opt.value)}
+              className={`rounded-lg px-2.5 py-1 text-xs ${
+                role === opt.value ? "bg-tg-button text-tg-buttonText" : "bg-tg-bg text-tg-text"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-500">A'zo qo'shib bo'lmadi.</p>}
+
+      <button
+        onClick={() => submit()}
+        disabled={!selectedUser || isPending}
+        className="rounded-xl bg-tg-button py-2 text-sm font-medium text-tg-buttonText disabled:opacity-60"
+      >
+        {isPending ? "Qo'shilmoqda..." : "Jamoaga qo'shish"}
+      </button>
     </div>
   );
 }
@@ -136,8 +362,11 @@ export default function ProjectDetailPage() {
 
       {tab === "seasons" && (
         <div className="flex flex-col gap-4">
+          {canManage && projectId && <AddSeasonForm projectId={projectId} />}
           {seasons?.length ? (
-            seasons.map((season) => <SeasonBlock key={season.id} season={season} />)
+            seasons.map((season) => (
+              <SeasonBlock key={season.id} season={season} canManage={!!canManage} />
+            ))
           ) : (
             <p className="text-sm text-tg-hint">Sezonlar hali qo'shilmagan.</p>
           )}
@@ -228,11 +457,12 @@ export default function ProjectDetailPage() {
       )}
 
       {tab === "team" && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          {canManage && projectId && <AddMemberForm projectId={projectId} />}
           {members?.length ? (
             members.map((m) => (
               <div key={m.id} className="rounded-xl bg-tg-secondaryBg px-3 py-2 text-sm text-tg-text">
-                {m.role_in_project}
+                {ROLE_OPTIONS.find((r) => r.value === m.role_in_project)?.label ?? m.role_in_project}
               </div>
             ))
           ) : (

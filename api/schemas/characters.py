@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from models.characters import CastType, ImageSource
+from schemas.auth import UserBrief
 
 
 class CharacterCreate(BaseModel):
@@ -42,10 +43,15 @@ class CharacterCastAdd(BaseModel):
     cast_type: CastType = CastType.main
 
 
+# Backward-compat nom — router va boshqa joylarda shu nom bilan ishlatiladi.
+CastMemberUser = UserBrief
+
+
 class CharacterCastOut(BaseModel):
     id: uuid.UUID
     character_id: uuid.UUID
     user_id: uuid.UUID
     cast_type: CastType
+    user: UserBrief
 
     model_config = {"from_attributes": True}

@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from models.projects import EpisodeStatus, ProjectRole, ProjectType
+from schemas.auth import UserBrief
 
 
 # ---------- Project ----------
@@ -49,6 +50,7 @@ class ProjectMemberOut(BaseModel):
     user_id: uuid.UUID
     role_in_project: ProjectRole
     added_at: datetime
+    user: UserBrief
 
     model_config = {"from_attributes": True}
 

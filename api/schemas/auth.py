@@ -7,6 +7,20 @@ class TelegramAuthRequest(BaseModel):
     init_data: str  # Mini App'dan kelgan xom Telegram.WebApp.initData satri
 
 
+class UserBrief(BaseModel):
+    """Boshqa obyektlar (ProjectMember, CharacterCast) ichida ko'rsatish
+    uchun foydalanuvchining qisqa profili — frontend faqat user_id borligida
+    ism/username ko'rsatish uchun qo'shimcha /users/search so'rovi
+    yubormasin deb, tegishli router shu yerda to'ldirib qaytaradi."""
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str | None
+    telegram_username: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     telegram_id: int

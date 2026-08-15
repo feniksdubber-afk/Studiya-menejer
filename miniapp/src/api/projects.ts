@@ -1,10 +1,22 @@
 import { apiClient } from "./client";
-import type { Episode, Project, ProjectMember, Season } from "@/types";
+import type { Episode, Project, ProjectMember, ProjectType, Season } from "@/types";
 
 export async function listProjects(includeArchived = false): Promise<Project[]> {
   const { data } = await apiClient.get<Project[]>("/projects", {
     params: { include_archived: includeArchived },
   });
+  return data;
+}
+
+export interface ProjectCreatePayload {
+  title: string;
+  type: ProjectType;
+  poster_url?: string | null;
+  anilist_id?: number | null;
+}
+
+export async function createProject(payload: ProjectCreatePayload): Promise<Project> {
+  const { data } = await apiClient.post<Project>("/projects", payload);
   return data;
 }
 

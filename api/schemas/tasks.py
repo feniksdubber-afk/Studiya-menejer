@@ -60,3 +60,11 @@ class DeadlineHistoryOut(BaseModel):
     changed_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class OverdueMarkResult(BaseModel):
+    """`/internal/tasks/mark-overdue` javobi — bot scheduleri natijani
+    log qilishi uchun (masalan nechta task 'delayed'ga o'tkazilgani)."""
+
+    marked_count: int
+    task_ids: list[uuid.UUID]

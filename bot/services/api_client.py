@@ -51,3 +51,26 @@ async def submit_file(
         raise InternalApiError(response.status_code, detail)
 
     return response.json()
+
+
+async def mark_overdue_tasks() -> dict:
+    """Deadline'i o'tib ketgan tasklarni 'delayed'ga o'tkazish uchun
+    /internal/tasks/mark-overdue'ni chaqiradi (bot/services/deadline_notifier.py
+    scheduler jobidan). Biznes logikaning o'zi API tomonda (services/task_engine.py)
+    — bot faqat natijani (qaysi task_id'lar o'zgargani) olib, shularga Telegram
+    push xabar yuboradi.
+    """
+    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            "/internal/tasks/mark-overdue",
+            headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
+        )
+
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("detail", response.text)
+        except ValueError:
+            detail = response.text
+        raise InternalApiError(response.status_code, detail)
+
+    return response.json()

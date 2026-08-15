@@ -12,6 +12,7 @@ yozuvini yaratadigan router shu flagni False'ga qaytarishi kerak) qayta
 yuborilmaydi.
 """
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
@@ -23,6 +24,7 @@ from models.characters import Character
 from models.projects import Episode, Project, Season
 from models.tasks import Task, TaskStatus, TaskType
 from models.users import User
+from services.api_client import InternalApiError, mark_overdue_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -106,3 +108,65 @@ async def _notify_one(db, bot: Bot, task: Task) -> None:
     task.notified_3h = True
 
     await db.commit()
+
+
+async def check_overdue_tasks(bot: Bot) -> None:
+    """Deadline'i o'tib ketgan tasklarni 'delayed'ga o'tkazish uchun API'ning
+    `/internal/tasks/mark-overdue` endpointini chaqiradi (biznes logika —
+    services/task_engine.py, holat o'zgartirish va in-app Notification
+    yaratish API tomonda bo'ladi). Bu funksiya faqat qaytgan task_id'lar
+    bo'yicha ijrochilarga Telegram push xabar yuboradi.
+    """
+    try:
+        result = await mark_overdue_tasks()
+    except InternalApiError:
+        logger.exception("Kechikkan tasklarni belgilashda API xatosi")
+        return
+    except Exception:
+        logger.exception("Kechikkan tasklarni belgilashda kutilmagan xato")
+        return
+
+    task_ids = result.get("task_ids") or []
+    if not task_ids:
+        return
+
+    logger.info("%d ta task 'kechikkan' deb belgilandi", len(task_ids))
+
+    async with get_session() as db:
+        for task_id_raw in task_ids:
+            try:
+                await _push_overdue_message(db, bot, uuid.UUID(task_id_raw))
+            except Exception:
+                logger.exception(
+                    "Kechikkan xabarini yuborishda xato (task_id=%s)", task_id_raw
+                )
+
+
+async def _push_overdue_message(db, bot: Bot, task_id: uuid.UUID) -> None:
+    task = await db.get(Task, task_id)
+    if task is None:
+        return
+    episode = await db.get(Episode, task.episode_id)
+    if episode is None:
+        return
+    season = await db.get(Season, episode.season_id)
+    project = await db.get(Project, season.project_id) if season else None
+    user = await db.get(User, task.assigned_to)
+    if user is None:
+        return
+
+    task_label = _TASK_TYPE_LABELS.get(task.task_type, str(task.task_type.value))
+    project_title = project.title if project else "?"
+    deadline_str = task.deadline.strftime("%d-%m %H:%M") if task.deadline else "-"
+
+    text = (
+        "⚠️ Deadline o'tib ketdi\n\n"
+        f"🎬 {project_title} — {episode.title}\n"
+        f"{task_label}\n"
+        f"🕐 Deadline: {deadline_str}\n\n"
+        "Iltimos, imkon qadar tezroq topshiring yoki rejissyor bilan bog'laning."
+    )
+    try:
+        await bot.send_message(user.telegram_id, text)
+    except Exception:
+        logger.exception("Foydalanuvchiga kechikish xabari yuborilmadi: telegram_id=%s", user.telegram_id)

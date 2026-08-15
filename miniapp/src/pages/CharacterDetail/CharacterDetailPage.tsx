@@ -12,11 +12,12 @@ import {
 } from "@/api/characters";
 import { searchUsers } from "@/api/users";
 import { Avatar } from "@/components/Avatar";
+import { Drama, Image, X, Mic2, Star } from "lucide-react";
 import type { CastType, User } from "@/types";
 
-const CAST_TYPE_META: Record<CastType, { label: string; badgeClass: string }> = {
-  main: { label: "⭐ Asosiy", badgeClass: "bg-emerald-100 text-emerald-700" },
-  alternate: { label: "Muqobil", badgeClass: "bg-tg-bg text-tg-hint" },
+const CAST_TYPE_META: Record<CastType, { label: string; badgeClass: string; icon: typeof Star | null }> = {
+  main: { label: "Asosiy", badgeClass: "bg-role-sound-50 text-role-sound-800", icon: Star },
+  alternate: { label: "Muqobil", badgeClass: "bg-tg-bg text-tg-hint", icon: null },
 };
 
 function AddActorForm({ characterId }: { characterId: string }) {
@@ -242,7 +243,9 @@ export default function CharacterDetailPage() {
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-5xl">🎭</div>
+            <div className="flex h-full items-center justify-center">
+              <Drama size={44} className="text-tg-hint" aria-hidden="true" />
+            </div>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0" />
         </div>
@@ -265,18 +268,20 @@ export default function CharacterDetailPage() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingImage}
-              className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur disabled:opacity-50"
             >
-              {isUploadingImage ? "Yuklanmoqda..." : "🖼 Rasm o'zgartirish"}
+              <Image size={13} aria-hidden="true" />
+              {isUploadingImage ? "Yuklanmoqda..." : "Rasm o'zgartirish"}
             </button>
             {character.image_source === "custom" && (
               <button
                 type="button"
                 onClick={() => removeImage()}
                 disabled={isRemovingImage}
-                className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur disabled:opacity-50"
+                aria-label="Rasmni olib tashlash"
+                className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur disabled:opacity-50"
               >
-                ✕
+                <X size={14} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -294,19 +299,21 @@ export default function CharacterDetailPage() {
       <div className="flex flex-col gap-5 px-5">
         {!character.is_active && (
           <div className="rounded-xl bg-tg-secondaryBg px-3 py-2 text-xs font-medium text-tg-hint">
-            ⚪ Bu personaj faol emas
+            Bu personaj faol emas
           </div>
         )}
 
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-tg-hint">🎙️ Ovoz aktyorlari</h2>
+            <h2 className="flex items-center gap-1.5 text-sm font-medium text-tg-hint">
+              <Mic2 size={14} aria-hidden="true" /> Ovoz aktyorlari
+            </h2>
             {canManage && characterId && <AddActorForm characterId={characterId} />}
           </div>
 
           {mainCast.length === 0 && altCast.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-2xl bg-tg-secondaryBg px-4 py-8 text-center">
-              <span className="text-2xl">🎙️</span>
+              <Mic2 size={22} className="text-tg-hint" aria-hidden="true" />
               <p className="text-sm text-tg-hint">
                 Hali hech kim biriktirilmagan.
                 {canManage ? " Yuqoridagi tugma orqali aktyor qo'shing." : ""}
@@ -331,8 +338,12 @@ export default function CharacterDetailPage() {
                     )}
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${CAST_TYPE_META[c.cast_type].badgeClass}`}
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${CAST_TYPE_META[c.cast_type].badgeClass}`}
                   >
+                    {(() => {
+                      const CastIcon = CAST_TYPE_META[c.cast_type].icon;
+                      return CastIcon ? <CastIcon size={11} aria-hidden="true" /> : null;
+                    })()}
                     {CAST_TYPE_META[c.cast_type].label}
                   </span>
                   {canManage && (

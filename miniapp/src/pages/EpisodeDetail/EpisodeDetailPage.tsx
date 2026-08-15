@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { getEpisode } from "@/api/projects";
 import { listEpisodeTasks } from "@/api/tasks";
-import { TaskStatusBadge } from "@/components/TaskStatusBadge";
-import { QueryError } from "@/components/StatusScreens";
+import { TaskStatusBadge, EpisodeStatusBadge } from "@/components/TaskStatusBadge";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
-import { Film } from "lucide-react";
+import { Film, ClipboardList } from "lucide-react";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
   translation: "Tarjima",
@@ -32,6 +33,7 @@ export default function EpisodeDetailPage() {
 
   const {
     data: tasks,
+    isLoading: isTasksLoading,
     isError: isTasksError,
     refetch: refetchTasks,
   } = useQuery({
@@ -41,7 +43,7 @@ export default function EpisodeDetailPage() {
   });
 
   if (isEpisodeLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
 
   if (isEpisodeError) {
@@ -58,18 +60,23 @@ export default function EpisodeDetailPage() {
         <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
           <Film size={18} aria-hidden="true" /> {episode?.title ?? "..."}
         </h1>
-        {episode && <p className="font-mono text-xs text-tg-hint">{episode.status}</p>}
+        {episode && <EpisodeStatusBadge status={episode.status} />}
       </div>
 
       <div className="flex flex-col gap-2">
         {isTasksError ? (
           <QueryError message="Vazifalarni yuklab bo'lmadi." onRetry={() => refetchTasks()} />
+        ) : isTasksLoading ? (
+          <div className="flex flex-col gap-2">
+            <div className="h-14 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+            <div className="h-14 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+          </div>
         ) : tasks?.length ? (
           tasks.map((task) => (
             <button
               key={task.id}
               onClick={() => navigate(`/tasks/${task.id}`)}
-              className="flex items-center justify-between rounded-2xl bg-tg-secondaryBg p-4 text-left"
+              className="flex items-center justify-between rounded-2xl bg-tg-secondaryBg p-4 text-left active:opacity-70"
             >
               <span className="text-sm font-medium text-tg-text">
                 {TASK_TYPE_LABEL[task.task_type] ?? task.task_type}
@@ -78,7 +85,7 @@ export default function EpisodeDetailPage() {
             </button>
           ))
         ) : (
-          <p className="text-sm text-tg-hint">Vazifalar hali qo'shilmagan.</p>
+          <EmptyState icon={ClipboardList} message="Vazifalar hali qo'shilmagan." />
         )}
       </div>
     </div>

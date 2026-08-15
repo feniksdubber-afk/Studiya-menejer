@@ -25,11 +25,18 @@ from schemas.projects import (
 from services.permissions import (
     get_membership,
     get_project_or_404,
+    is_project_director,
     project_director_access,
     project_view_access,
     require_project_director,
 )
 router = APIRouter(tags=["projects"])
+
+
+def _project_out(project: Project, can_manage: bool) -> ProjectOut:
+    out = ProjectOut.model_validate(project)
+    out.can_manage = can_manage
+    return out
 
 
 # ==================== PROJECTS ====================
@@ -71,7 +78,9 @@ async def create_project(
 
     await db.commit()
     await db.refresh(project)
-    return project
+    # Yaratuvchi har doim yaratilgan loyihani boshqara oladi (director_main
+    # sifatida a'zo bo'ldi, yoki admin/super_admin sifatida yaratdi).
+    return _project_out(project, can_manage=True)
 
 
 @router.get("/projects", response_model=list[ProjectOut])
@@ -85,7 +94,20 @@ async def list_projects(
         query = query.where(Project.is_archived.is_(False))
     query = query.order_by(Project.created_at.desc())
     result = await db.execute(query)
-    return result.scalars().all()
+    projects = list(result.scalars().all())
+
+    if user.is_admin or user.is_super_admin:
+        director_project_ids: set[uuid.UUID] = {p.id for p in projects}
+    else:
+        member_result = await db.execute(
+            select(ProjectMember.project_id).where(
+                ProjectMember.user_id == user.id,
+                ProjectMember.role_in_project.in_([ProjectRole.director_main, ProjectRole.director_extra]),
+            )
+        )
+        director_project_ids = {row[0] for row in member_result.all()}
+
+    return [_project_out(p, can_manage=p.id in director_project_ids) for p in projects]
 
 
 @router.get("/projects/{project_id}", response_model=ProjectOut)
@@ -94,7 +116,9 @@ async def get_project(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_registered_user),
 ):
-    return await get_project_or_404(project_id, db)
+    project = await get_project_or_404(project_id, db)
+    can_manage = await is_project_director(db, project_id, user)
+    return _project_out(project, can_manage=can_manage)
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectOut)
@@ -109,7 +133,7 @@ async def update_project(
         setattr(project, field, value)
     await db.commit()
     await db.refresh(project)
-    return project
+    return _project_out(project, can_manage=True)
 
 
 @router.post("/projects/{project_id}/archive", response_model=ProjectOut)
@@ -121,7 +145,7 @@ async def archive_project(
     project.is_archived = True
     await db.commit()
     await db.refresh(project)
-    return project
+    return _project_out(project, can_manage=True)
 
 
 @router.post("/projects/{project_id}/unarchive", response_model=ProjectOut)
@@ -133,7 +157,7 @@ async def unarchive_project(
     project.is_archived = False
     await db.commit()
     await db.refresh(project)
-    return project
+    return _project_out(project, can_manage=True)
 
 
 # ==================== PROJECT MEMBERS ====================

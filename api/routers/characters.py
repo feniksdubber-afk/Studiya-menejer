@@ -19,18 +19,24 @@ from schemas.characters import (
     CharacterUpdate,
 )
 from services.image_processing import validate_and_convert_to_webp
-from services.permissions import get_membership, get_project_or_404, require_project_director
+from services.permissions import (
+    get_membership,
+    get_project_or_404,
+    is_project_director,
+    require_project_director,
+)
 from services import r2_storage
 
 router = APIRouter(tags=["characters"])
 
 
-def _with_display_url(character: Character) -> CharacterOut:
+def _with_display_url(character: Character, can_manage: bool = False) -> CharacterOut:
     out = CharacterOut.model_validate(character)
     if character.image_source == ImageSource.custom and character.custom_image_key:
         out.display_image_url = r2_storage.public_url(character.custom_image_key)
     else:
         out.display_image_url = character.anilist_image_url
+    out.can_manage = can_manage
     return out
 
 
@@ -56,7 +62,8 @@ async def list_characters(
     if not include_inactive:
         query = query.where(Character.is_active.is_(True))
     result = await db.execute(query.order_by(Character.name))
-    return [_with_display_url(c) for c in result.scalars().all()]
+    can_manage = await is_project_director(db, project.id, user)
+    return [_with_display_url(c, can_manage) for c in result.scalars().all()]
 
 
 @router.post(
@@ -85,7 +92,7 @@ async def create_character(
     db.add(character)
     await db.commit()
     await db.refresh(character)
-    return _with_display_url(character)
+    return _with_display_url(character, can_manage=True)
 
 
 async def _get_character_or_404(db: AsyncSession, character_id: uuid.UUID) -> Character:
@@ -104,7 +111,8 @@ async def get_character(
     character = await _get_character_or_404(db, character_id)
     project = await get_project_or_404(character.project_id, db)
     await _check_view_access(db, project, user)
-    return _with_display_url(character)
+    can_manage = await is_project_director(db, project.id, user)
+    return _with_display_url(character, can_manage)
 
 
 @router.patch("/characters/{character_id}", response_model=CharacterOut)
@@ -123,7 +131,7 @@ async def update_character(
         setattr(character, field, value)
     await db.commit()
     await db.refresh(character)
-    return _with_display_url(character)
+    return _with_display_url(character, can_manage=True)
 
 
 @router.delete("/characters/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -185,7 +193,7 @@ async def upload_character_image(
     if old_key:
         r2_storage.delete_object(old_key)
 
-    return _with_display_url(character)
+    return _with_display_url(character, can_manage=True)
 
 
 @router.delete("/characters/{character_id}/image", response_model=CharacterOut)
@@ -211,7 +219,7 @@ async def delete_character_image(
 
     r2_storage.delete_object(old_key)
 
-    return _with_display_url(character)
+    return _with_display_url(character, can_manage=True)
 
 
 # ==================== CHARACTER CAST ====================

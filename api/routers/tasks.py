@@ -19,10 +19,21 @@ from schemas.tasks import (
     TaskUpdate,
 )
 from services.notification_dispatcher import notify
-from services.permissions import get_membership, get_project_or_404, require_project_director
+from services.permissions import (
+    get_membership,
+    get_project_or_404,
+    is_project_director,
+    require_project_director,
+)
 from services.task_engine import recompute_episode_status
 
 router = APIRouter(tags=["tasks"])
+
+
+def _task_out(task: Task, can_manage: bool) -> TaskOut:
+    out = TaskOut.model_validate(task)
+    out.can_manage = can_manage
+    return out
 
 
 async def _get_episode_and_project(db: AsyncSession, episode_id: uuid.UUID):
@@ -67,7 +78,8 @@ async def list_episode_tasks(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu loyiha a'zosi emassiz")
 
     result = await db.execute(select(Task).where(Task.episode_id == episode_id))
-    return result.scalars().all()
+    can_manage = await is_project_director(db, project.id, user)
+    return [_task_out(t, can_manage) for t in result.scalars().all()]
 
 
 @router.get("/tasks/mine", response_model=list[TaskOut])
@@ -90,7 +102,17 @@ async def list_my_tasks(
         return (base, deadline)
 
     tasks.sort(key=sort_key)
-    return tasks
+
+    # Har bir task boshqa loyihaga tegishli bo'lishi mumkin — loyiha
+    # bo'yicha natijani keshlab, takroriy so'rovlarning oldini olamiz.
+    project_can_manage_cache: dict[uuid.UUID, bool] = {}
+    out: list[TaskOut] = []
+    for t in tasks:
+        _, project = await _get_episode_and_project(db, t.episode_id)
+        if project.id not in project_can_manage_cache:
+            project_can_manage_cache[project.id] = await is_project_director(db, project.id, user)
+        out.append(_task_out(t, project_can_manage_cache[project.id]))
+    return out
 
 
 @router.post(
@@ -138,7 +160,7 @@ async def create_task(
         type_="task_assigned",
         payload={"task_id": str(task.id), "episode_id": str(episode_id), "task_type": task.task_type.value},
     )
-    return task
+    return _task_out(task, can_manage=True)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
@@ -149,7 +171,9 @@ async def get_task(
 ):
     task = await _get_task_or_404(db, task_id)
     await _check_task_view_access(db, task, user)
-    return task
+    _, project = await _get_episode_and_project(db, task.episode_id)
+    can_manage = await is_project_director(db, project.id, user)
+    return _task_out(task, can_manage)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskOut)
@@ -186,7 +210,7 @@ async def update_task(
             type_="task_assigned",
             payload={"task_id": str(task.id), "episode_id": str(task.episode_id)},
         )
-    return task
+    return _task_out(task, can_manage=True)
 
 
 @router.post("/tasks/{task_id}/status", response_model=TaskOut)
@@ -239,7 +263,7 @@ async def set_task_status(
                 payload={"task_id": str(task.id)},
             )
 
-    return task
+    return _task_out(task, is_privileged)
 
 
 @router.post("/tasks/{task_id}/request-revision", response_model=TaskOut)
@@ -280,7 +304,7 @@ async def request_revision(
         type_="task_revision_requested",
         payload={"task_id": str(task.id), "reason": payload.reason},
     )
-    return task
+    return _task_out(task, can_manage=True)
 
 
 @router.get("/tasks/{task_id}/deadline-history", response_model=list[DeadlineHistoryOut])

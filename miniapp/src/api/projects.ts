@@ -42,6 +42,10 @@ export async function addProjectMember(
   return data;
 }
 
+export async function removeProjectMember(projectId: string, memberId: string): Promise<void> {
+  await apiClient.delete(`/projects/${projectId}/members/${memberId}`);
+}
+
 export async function listSeasons(projectId: string): Promise<Season[]> {
   const { data } = await apiClient.get<Season[]>(`/projects/${projectId}/seasons`);
   return data;

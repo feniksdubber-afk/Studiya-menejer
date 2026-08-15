@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Character, CharacterCast } from "@/types";
+import type { CastType, Character, CharacterCast } from "@/types";
 
 export async function listCharacters(projectId: string): Promise<Character[]> {
   const { data } = await apiClient.get<Character[]>(`/projects/${projectId}/characters`);
@@ -28,6 +28,22 @@ export async function getCharacter(characterId: string): Promise<Character> {
 export async function listCharacterCast(characterId: string): Promise<CharacterCast[]> {
   const { data } = await apiClient.get<CharacterCast[]>(`/characters/${characterId}/cast`);
   return data;
+}
+
+export async function addCharacterCast(
+  characterId: string,
+  userId: string,
+  castType: CastType
+): Promise<CharacterCast> {
+  const { data } = await apiClient.post<CharacterCast>(`/characters/${characterId}/cast`, {
+    user_id: userId,
+    cast_type: castType,
+  });
+  return data;
+}
+
+export async function removeCharacterCast(characterId: string, castId: string): Promise<void> {
+  await apiClient.delete(`/characters/${characterId}/cast/${castId}`);
 }
 
 export async function uploadCharacterImage(characterId: string, file: File): Promise<Character> {

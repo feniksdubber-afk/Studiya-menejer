@@ -6,8 +6,10 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/api/notifications";
-import { QueryError } from "@/components/StatusScreens";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
+import { useToast } from "@/components/Toast";
 import {
   BellRing,
   ClipboardCheck,
@@ -62,7 +64,7 @@ function NotificationRow({
   return (
     <button
       onClick={() => onOpen(notification)}
-      className={`flex items-start gap-3 rounded-2xl p-3.5 text-left transition-colors ${
+      className={`flex items-start gap-3 rounded-2xl p-3.5 text-left transition-colors active:opacity-70 ${
         notification.is_read ? "bg-tg-secondaryBg" : "bg-tg-button/10"
       }`}
     >
@@ -88,6 +90,7 @@ export default function NotificationsPage() {
   useTelegramBackButton("/profile");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showError } = useToast();
 
   const {
     data: notifications,
@@ -120,6 +123,10 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Bildirishnomalarni o'qilgan qilib bo'lmadi.");
+    },
   });
 
   function handleOpen(n: Notification) {
@@ -132,7 +139,7 @@ export default function NotificationsPage() {
   const hasUnread = (notifications ?? []).some((n) => !n.is_read);
 
   if (isLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
   if (isError) {
     return (
@@ -158,7 +165,7 @@ export default function NotificationsPage() {
       </div>
 
       {!notifications || notifications.length === 0 ? (
-        <p className="text-sm text-tg-hint">Hozircha bildirishnomalar yo'q.</p>
+        <EmptyState icon={BellRing} message="Hozircha bildirishnomalar yo'q." />
       ) : (
         <div className="flex flex-col gap-2">
           {notifications.map((n) => (

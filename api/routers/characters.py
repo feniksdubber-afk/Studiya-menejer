@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -293,7 +294,18 @@ async def add_character_cast(
         cast_type=payload.cast_type,
     )
     db.add(cast)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Yuqoridagi tekshiruv ("avval tekshir, keyin qo'sh") race
+        # condition'ga ochiq -- DB darajasidagi unique constraint
+        # (uq_character_cast_character_user, 0005 migratsiyasi) yakuniy
+        # himoya chizig'i bo'lib xizmat qiladi.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu aktyor allaqachon shu personajga biriktirilgan",
+        )
     await db.refresh(cast)
     return CharacterCastOut(
         id=cast.id,

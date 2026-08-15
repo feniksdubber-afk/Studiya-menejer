@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import get_db
@@ -226,7 +227,16 @@ async def add_project_member(
         role_in_project=payload.role_in_project,
     )
     db.add(member)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # `existing = await get_membership(...)` yuqorida race condition'ga
+        # ochiq (ikki so'rov bir vaqtda shu tekshiruvdan o'tib ketishi
+        # mumkin) -- shuning uchun DB darajasidagi unique constraint
+        # (uq_project_members_project_user, 0005 migratsiyasi) yakuniy
+        # himoya chizig'i bo'lib xizmat qiladi.
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Foydalanuvchi allaqachon a'zo")
     await db.refresh(member)
     return ProjectMemberOut(
         id=member.id,

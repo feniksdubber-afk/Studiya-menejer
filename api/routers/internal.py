@@ -60,11 +60,19 @@ async def internal_mark_overdue_tasks(db: AsyncSession = Depends(get_db)):
     changed_tasks = await mark_overdue_tasks_delayed(db)
 
     for task in changed_tasks:
+        # Ijrochiga Telegram push xabari shu javobdagi task_id'lar asosida
+        # bot tomonidan darhol (bot/services/deadline_notifier.py:
+        # check_overdue_tasks -> _push_overdue_message) yuboriladi, shuning
+        # uchun bu yozuv `already_delivered=True` bilan darhol "pushed"
+        # deb belgilanadi -- aks holda umumiy push navbatchisi
+        # (notification_pusher.py) xuddi shu xabarni yana bir marta
+        # yuborib yuborardi.
         await notify(
             db,
             user_id=task.assigned_to,
             type_="task_delayed",
             payload={"task_id": str(task.id), "episode_id": str(task.episode_id)},
+            already_delivered=True,
         )
 
         episode = await db.get(Episode, task.episode_id)

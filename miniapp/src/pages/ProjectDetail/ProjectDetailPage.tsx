@@ -9,23 +9,43 @@ import {
   createSeason,
   createEpisode,
   addProjectMember,
+  removeProjectMember,
 } from "@/api/projects";
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
 import { searchUsers } from "@/api/users";
 import { useAuth } from "@/auth/useAuth";
-import type { ProjectRole, Season, User } from "@/types";
+import { Avatar } from "@/components/Avatar";
+import type { ProjectMember, ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
+type RoleCategory = "director" | "translator" | "voice_actor" | "sound";
 
-const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = [
-  { value: "director_main", label: "Bosh rejissyor" },
-  { value: "director_extra", label: "Yordamchi rejissyor" },
-  { value: "translator_main", label: "Bosh tarjimon" },
-  { value: "translator_extra", label: "Yordamchi tarjimon" },
-  { value: "sound_main", label: "Bosh ovoz muharriri" },
-  { value: "sound_extra", label: "Yordamchi ovoz muharriri" },
-];
+// Rol -> (yorliq, kategoriya). Kategoriya Team tab'ida bo'limlarga
+// guruhlash va rangli badge tanlash uchun ishlatiladi.
+const ROLE_META: Record<ProjectRole, { label: string; category: RoleCategory }> = {
+  director_main: { label: "Bosh rejissyor", category: "director" },
+  director_extra: { label: "Yordamchi rejissyor", category: "director" },
+  translator_main: { label: "Bosh tarjimon", category: "translator" },
+  translator_extra: { label: "Yordamchi tarjimon", category: "translator" },
+  voice_actor_main: { label: "Ovoz aktyori", category: "voice_actor" },
+  voice_actor_extra: { label: "Zaxira ovoz aktyori", category: "voice_actor" },
+  sound_main: { label: "Bosh ovoz muharriri", category: "sound" },
+  sound_extra: { label: "Yordamchi ovoz muharriri", category: "sound" },
+};
+
+const CATEGORY_META: Record<RoleCategory, { title: string; icon: string; badgeClass: string }> = {
+  director: { title: "Rejissyorlar", icon: "🎬", badgeClass: "bg-violet-100 text-violet-700" },
+  translator: { title: "Tarjimonlar", icon: "📝", badgeClass: "bg-sky-100 text-sky-700" },
+  voice_actor: { title: "Ovoz aktyorlari", icon: "🎙️", badgeClass: "bg-emerald-100 text-emerald-700" },
+  sound: { title: "Svedeniyachilar", icon: "🎧", badgeClass: "bg-amber-100 text-amber-700" },
+};
+
+const CATEGORY_ORDER: RoleCategory[] = ["director", "translator", "voice_actor", "sound"];
+
+const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = (
+  Object.keys(ROLE_META) as ProjectRole[]
+).map((value) => ({ value, label: ROLE_META[value].label }));
 
 function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean }) {
   const navigate = useNavigate();
@@ -164,19 +184,26 @@ function AddMemberForm({ projectId }: { projectId: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [role, setRole] = useState<ProjectRole>("translator_main");
 
-  const { mutate: submit, isPending, error } = useMutation({
+  const { mutate: submit, isPending, error, reset } = useMutation({
     mutationFn: () => addProjectMember(projectId, selectedUser!.id, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members", projectId] });
-      setIsOpen(false);
-      setSelectedUser(null);
-      setQuery("");
-      setResults([]);
+      resetForm();
     },
   });
+
+  function resetForm() {
+    setIsOpen(false);
+    setSelectedUser(null);
+    setQuery("");
+    setResults([]);
+    setRole("translator_main");
+    reset();
+  }
 
   async function handleQueryChange(value: string) {
     setQuery(value);
@@ -185,10 +212,13 @@ function AddMemberForm({ projectId }: { projectId: string }) {
       setResults([]);
       return;
     }
+    setIsSearching(true);
     try {
       setResults(await searchUsers(value.trim()));
     } catch {
       setResults([]);
+    } finally {
+      setIsSearching(false);
     }
   }
 
@@ -196,7 +226,7 @@ function AddMemberForm({ projectId }: { projectId: string }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="self-start rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
+        className="self-start rounded-xl bg-tg-button px-3.5 py-2 text-sm font-medium text-tg-buttonText shadow-sm active:opacity-80"
       >
         + A'zo qo'shish
       </button>
@@ -204,59 +234,152 @@ function AddMemberForm({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3">
-      <input
-        value={query}
-        onChange={(e) => handleQueryChange(e.target.value)}
-        placeholder="Ism yoki username bo'yicha qidirish"
-        autoFocus
-        className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
-      />
+    <div className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-tg-hint">Foydalanuvchini qidirish</label>
+        <input
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
+          placeholder="Ism yoki @username"
+          autoFocus
+          className="rounded-xl bg-tg-bg px-3 py-2.5 text-sm text-tg-text outline-none ring-1 ring-transparent focus:ring-tg-button/40"
+        />
+        {isSearching && <p className="text-xs text-tg-hint">Qidirilmoqda...</p>}
+      </div>
 
       {results.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-xl bg-tg-bg p-1.5">
           {results.map((u) => (
             <button
               key={u.id}
+              type="button"
               onClick={() => {
                 setSelectedUser(u);
                 setQuery(`${u.first_name}${u.telegram_username ? " @" + u.telegram_username : ""}`);
                 setResults([]);
               }}
-              className="rounded-lg px-2 py-1.5 text-left text-sm text-tg-text hover:bg-tg-bg"
+              className="flex items-center gap-2.5 rounded-lg p-1.5 text-left hover:bg-tg-secondaryBg"
             >
-              {u.first_name} {u.telegram_username ? `@${u.telegram_username}` : ""}
+              <Avatar firstName={u.first_name} lastName={u.last_name} size="sm" />
+              <div className="flex flex-col">
+                <span className="text-sm text-tg-text">
+                  {u.first_name} {u.last_name ?? ""}
+                </span>
+                {u.telegram_username && (
+                  <span className="text-xs text-tg-hint">@{u.telegram_username}</span>
+                )}
+              </div>
             </button>
           ))}
         </div>
       )}
 
       {selectedUser && (
-        <div className="flex flex-wrap gap-2">
-          {ROLE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setRole(opt.value)}
-              className={`rounded-lg px-2.5 py-1 text-xs ${
-                role === opt.value ? "bg-tg-button text-tg-buttonText" : "bg-tg-bg text-tg-text"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2.5 rounded-xl bg-tg-button/10 p-2.5">
+          <Avatar firstName={selectedUser.first_name} lastName={selectedUser.last_name} size="sm" />
+          <span className="text-sm font-medium text-tg-text">
+            {selectedUser.first_name} {selectedUser.last_name ?? ""}
+          </span>
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">A'zo qo'shib bo'lmadi.</p>}
+      {selectedUser && (
+        <div className="flex flex-col gap-2.5">
+          <label className="text-xs font-medium text-tg-hint">Rolni tanlang</label>
+          {CATEGORY_ORDER.map((cat) => {
+            const meta = CATEGORY_META[cat];
+            const options = ROLE_OPTIONS.filter((opt) => ROLE_META[opt.value].category === cat);
+            return (
+              <div key={cat} className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium text-tg-hint">
+                  {meta.icon} {meta.title}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRole(opt.value)}
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        role === opt.value
+                          ? "bg-tg-button text-tg-buttonText"
+                          : "bg-tg-bg text-tg-text"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      <button
-        onClick={() => submit()}
-        disabled={!selectedUser || isPending}
-        className="rounded-xl bg-tg-button py-2 text-sm font-medium text-tg-buttonText disabled:opacity-60"
-      >
-        {isPending ? "Qo'shilmoqda..." : "Jamoaga qo'shish"}
-      </button>
+      {error && (
+        <p className="text-xs text-red-500">
+          A'zo qo'shib bo'lmadi{selectedUser ? " — foydalanuvchi allaqachon jamoada bo'lishi mumkin." : "."}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={resetForm}
+          className="flex-1 rounded-xl bg-tg-bg py-2.5 text-sm font-medium text-tg-hint"
+        >
+          Bekor qilish
+        </button>
+        <button
+          onClick={() => submit()}
+          disabled={!selectedUser || isPending}
+          className="flex-[2] rounded-xl bg-tg-button py-2.5 text-sm font-medium text-tg-buttonText shadow-sm disabled:opacity-50"
+        >
+          {isPending ? "Qo'shilmoqda..." : "Jamoaga qo'shish"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MemberRow({
+  member,
+  canManage,
+  onRemove,
+  isRemoving,
+}: {
+  member: ProjectMember;
+  canManage: boolean;
+  onRemove: () => void;
+  isRemoving: boolean;
+}) {
+  const meta = ROLE_META[member.role_in_project];
+  const categoryMeta = CATEGORY_META[meta.category];
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-tg-secondaryBg p-3">
+      <Avatar firstName={member.user.first_name} lastName={member.user.last_name} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-sm font-medium text-tg-text">
+          {member.user.first_name} {member.user.last_name ?? ""}
+        </span>
+        {member.user.telegram_username && (
+          <span className="truncate text-xs text-tg-hint">@{member.user.telegram_username}</span>
+        )}
+      </div>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${categoryMeta.badgeClass}`}>
+        {meta.label}
+      </span>
+      {canManage && (
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={isRemoving}
+          aria-label="A'zoni olib tashlash"
+          className="shrink-0 rounded-full p-1.5 text-tg-hint active:bg-tg-bg disabled:opacity-40"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
@@ -295,6 +418,15 @@ export default function ProjectDetailPage() {
     queryFn: () => listProjectMembers(projectId!),
     enabled: !!projectId && tab === "team",
   });
+
+  const { mutate: removeMember, variables: removingMemberVars } = useMutation({
+    mutationFn: ({ projectId: pid, memberId }: { projectId: string; memberId: string }) =>
+      removeProjectMember(pid, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members", projectId] });
+    },
+  });
+  const removingMemberId = removingMemberVars?.memberId ?? null;
 
   const { data: aniListCharacters, isLoading: isLoadingAniList } = useQuery({
     queryKey: ["anilist-characters", project?.anilist_id],
@@ -457,14 +589,35 @@ export default function ProjectDetailPage() {
       )}
 
       {tab === "team" && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {canManage && projectId && <AddMemberForm projectId={projectId} />}
+
           {members?.length ? (
-            members.map((m) => (
-              <div key={m.id} className="rounded-xl bg-tg-secondaryBg px-3 py-2 text-sm text-tg-text">
-                {ROLE_OPTIONS.find((r) => r.value === m.role_in_project)?.label ?? m.role_in_project}
-              </div>
-            ))
+            CATEGORY_ORDER.map((cat) => {
+              const meta = CATEGORY_META[cat];
+              const group = members.filter((m) => ROLE_META[m.role_in_project].category === cat);
+              if (group.length === 0) return null;
+              return (
+                <section key={cat} className="flex flex-col gap-2">
+                  <h2 className="text-sm font-medium text-tg-hint">
+                    {meta.icon} {meta.title} · {group.length}
+                  </h2>
+                  <div className="flex flex-col gap-2">
+                    {group.map((m) => (
+                      <MemberRow
+                        key={m.id}
+                        member={m}
+                        canManage={!!canManage}
+                        isRemoving={removingMemberId === m.id}
+                        onRemove={() => {
+                          if (projectId) removeMember({ projectId, memberId: m.id });
+                        }}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })
           ) : (
             <p className="text-sm text-tg-hint">Jamoa a'zolari hali qo'shilmagan.</p>
           )}

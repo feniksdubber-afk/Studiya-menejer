@@ -1,7 +1,8 @@
 import enum
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +22,8 @@ class ProjectRole(str, enum.Enum):
     director_extra = "director_extra"
     translator_main = "translator_main"
     translator_extra = "translator_extra"
+    voice_actor_main = "voice_actor_main"
+    voice_actor_extra = "voice_actor_extra"
     sound_main = "sound_main"
     sound_extra = "sound_extra"
 
@@ -52,6 +55,10 @@ class ProjectMember(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"))
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     role_in_project: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole, name="project_role"), nullable=False)
+    # MUHIM: schemas/projects.py:ProjectMemberOut bu maydonni doim talab qilib
+    # kelgan, lekin ustunning o'zi yaratilmagan edi — a'zolar ro'yxatini olish
+    # amalda xato bilan tugardi. 0004 migratsiyasi shu ustunni qo'shadi.
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Season(Base):

@@ -14,7 +14,6 @@ import {
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
 import { searchUsers } from "@/api/users";
-import { useAuth } from "@/auth/useAuth";
 import { Avatar } from "@/components/Avatar";
 import type { ProjectMember, ProjectRole, Season, User } from "@/types";
 
@@ -388,18 +387,22 @@ export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("seasons");
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-
-  const canManage = user?.role === "director" || user?.is_admin || user?.is_super_admin;
 
   const { data: project } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId!),
     enabled: !!projectId,
   });
+
+  // MUHIM: bu global user.role emas — backend har bir loyiha uchun
+  // alohida hisoblaydi (shu loyihaning director_main/extra a'zosimi
+  // yoki admin/super_admin). Shu tufayli boshqa loyihada rejissyor
+  // bo'lgan, lekin bu yerda oddiy a'zo bo'lgan foydalanuvchiga
+  // boshqaruv tugmalari ko'rsatilmaydi.
+  const canManage = project?.can_manage ?? false;
 
   const { data: seasons } = useQuery({
     queryKey: ["seasons", projectId],

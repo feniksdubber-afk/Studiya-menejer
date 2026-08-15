@@ -880,10 +880,16 @@ export default function ProjectDetailPage() {
   // qarang: CharacterDetailPage.tsx'dagi xuddi shu naqsh.
   const removingMemberId = isRemovingMember ? removingMemberVars?.memberId ?? null : null;
 
-  const { data: aniListCharacters, isLoading: isLoadingAniList } = useQuery({
+  const {
+    data: aniListCharacters,
+    isLoading: isLoadingAniList,
+    isError: isAniListCharactersError,
+    refetch: refetchAniListCharacters,
+  } = useQuery({
     queryKey: ["anilist-characters", project?.anilist_id],
     queryFn: () => getAniListCharacters(project!.anilist_id!),
     enabled: isImportOpen && !!project?.anilist_id,
+    retry: 1,
   });
 
   const { mutate: importSelected, isPending: isImporting } = useMutation({
@@ -928,6 +934,21 @@ export default function ProjectDetailPage() {
   }
 
   const existingNames = new Set((characters ?? []).map((c) => c.anilist_original_name ?? c.name));
+
+  const selectableIds = (aniListCharacters ?? [])
+    .filter((c) => !existingNames.has(c.native_name ?? c.name))
+    .map((c) => c.anilist_character_id);
+  const allSelectableSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (allSelectableSelected) {
+        return new Set();
+      }
+      return new Set([...prev, ...selectableIds]);
+    });
+  }
 
   if (isProjectLoading) {
     return <LoadingScreen />;
@@ -1004,6 +1025,31 @@ export default function ProjectDetailPage() {
               )}
               {!isLoadingAniList && aniListCharacters?.length === 0 && (
                 <p className="text-sm text-tg-hint">AniList'da personajlar topilmadi.</p>
+              )}
+              {isAniListCharactersError && (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-role-voice-50 px-2.5 py-1.5 dark:bg-role-voice-900/30">
+                  <span className="text-xs text-role-voice-800 dark:text-role-voice-400">
+                    Personajlarni yuklab bo'lmadi.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => refetchAniListCharacters()}
+                    className="shrink-0 text-xs font-medium text-role-voice-800 underline dark:text-role-voice-400"
+                  >
+                    Qayta urinish
+                  </button>
+                </div>
+              )}
+              {selectableIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="self-start rounded-lg bg-tg-bg px-2.5 py-1 text-xs font-medium text-tg-text active:opacity-70"
+                >
+                  {allSelectableSelected
+                    ? "Tanlovni bekor qilish"
+                    : `Hammasini tanlash (${selectableIds.length})`}
+                </button>
               )}
               <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
                 {aniListCharacters?.map((c: AniListCharacter) => {

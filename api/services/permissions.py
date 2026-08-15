@@ -71,6 +71,18 @@ project_view_access = ProjectAccess(require_director=False)
 project_director_access = ProjectAccess(require_director=True)
 
 
+async def is_project_director(db: AsyncSession, project_id: uuid.UUID, user: User) -> bool:
+    """Joriy user shu KONKRET loyihada boshqarish huquqiga ega-yo'qligini
+    qaytaradi (admin/super_admin YOKI shu loyihada director_main/extra).
+    Frontendga `can_manage` sifatida qaytariladi — global `user.role`ga
+    emas, aynan shu loyihadagi a'zolikka asoslanadi (§ ruxsat arxitekturasi).
+    """
+    if user.is_admin or user.is_super_admin:
+        return True
+    membership = await get_membership(db, project_id, user.id)
+    return membership is not None and membership.role_in_project in DIRECTOR_ROLES
+
+
 async def require_project_director(
     project: Project,
     user: User,

@@ -50,5 +50,52 @@ def is_task_overdue(task: Task) -> bool:
     return (
         task.deadline is not None
         and task.deadline < datetime.now(timezone.utc)
-        and task.status not in (TaskStatus.accepted,)
+        and task.status not in (TaskStatus.accepted, TaskStatus.delayed)
     )
+
+
+# Bu holatlardan avtomatik 'delayed'ga o'tish mumkin. 'accepted' — vazifa
+# allaqachon yakunlangan, deadline'dan qat'iy nazar hech qachon kechikkan
+# deb belgilanmaydi. 'delayed'ning o'zi ham istisno — idempotentlik uchun
+# (bir marta belgilangan taskka qayta tegilmaymiz/qayta bildirishnoma
+# yubormaymiz).
+_OVERDUE_ELIGIBLE_STATUSES = (
+    TaskStatus.pending,
+    TaskStatus.submitted,
+    TaskStatus.revision_requested,
+)
+
+
+async def mark_overdue_tasks_delayed(db: AsyncSession) -> list[Task]:
+    """Deadline'i o'tib ketgan, hali yakunlanmagan va hali 'delayed' deb
+    belgilanmagan barcha tasklarni topib, statusini 'delayed'ga o'zgartiradi
+    va tegishli qism (Episode) statusini qayta hisoblaydi.
+
+    Bot scheduleri tomonidan davriy chaqiriladi (§ /internal/tasks/mark-overdue).
+    Bildirishnoma yuborish va Telegram push — chaqiruvchi (router/bot) tomonda,
+    bu funksiya faqat holatni o'zgartiradi va o'zgargan tasklarni qaytaradi.
+    """
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Task)
+        .where(Task.deadline.is_not(None))
+        .where(Task.deadline < now)
+        .where(Task.status.in_(_OVERDUE_ELIGIBLE_STATUSES))
+    )
+    overdue_tasks = list(result.scalars().all())
+    if not overdue_tasks:
+        return []
+
+    episode_ids: set[uuid.UUID] = set()
+    for task in overdue_tasks:
+        task.status = TaskStatus.delayed
+        episode_ids.add(task.episode_id)
+
+    await db.commit()
+    for task in overdue_tasks:
+        await db.refresh(task)
+
+    for episode_id in episode_ids:
+        await recompute_episode_status(db, episode_id)
+
+    return overdue_tasks

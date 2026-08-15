@@ -11,6 +11,7 @@ from models.projects import Project
 from models.users import User
 from routers.auth import require_registered_user
 from schemas.characters import (
+    CastMemberUser,
     CharacterCastAdd,
     CharacterCastOut,
     CharacterCreate,
@@ -225,8 +226,25 @@ async def list_character_cast(
     project = await get_project_or_404(character.project_id, db)
     await _check_view_access(db, project, user)
 
-    result = await db.execute(select(CharacterCast).where(CharacterCast.character_id == character_id))
-    return result.scalars().all()
+    # CharacterCast'da user'ga SQLAlchemy relationship yo'q (ataylab —
+    # oddiy FK), shuning uchun bu yerda User bilan qo'lda JOIN qilib,
+    # frontend N+1 so'rov yubormasligi uchun ism/username'ni birga qaytaramiz.
+    result = await db.execute(
+        select(CharacterCast, User)
+        .join(User, User.id == CharacterCast.user_id)
+        .where(CharacterCast.character_id == character_id)
+        .order_by(CharacterCast.cast_type)
+    )
+    return [
+        CharacterCastOut(
+            id=cast.id,
+            character_id=cast.character_id,
+            user_id=cast.user_id,
+            cast_type=cast.cast_type,
+            user=CastMemberUser.model_validate(cast_user),
+        )
+        for cast, cast_user in result.all()
+    ]
 
 
 @router.post(
@@ -248,6 +266,18 @@ async def add_character_cast(
     if target_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
 
+    existing = await db.execute(
+        select(CharacterCast).where(
+            CharacterCast.character_id == character_id,
+            CharacterCast.user_id == payload.user_id,
+        )
+    )
+    if existing.scalars().first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu aktyor allaqachon shu personajga biriktirilgan",
+        )
+
     cast = CharacterCast(
         id=uuid.uuid4(),
         character_id=character_id,
@@ -257,7 +287,13 @@ async def add_character_cast(
     db.add(cast)
     await db.commit()
     await db.refresh(cast)
-    return cast
+    return CharacterCastOut(
+        id=cast.id,
+        character_id=cast.character_id,
+        user_id=cast.user_id,
+        cast_type=cast.cast_type,
+        user=CastMemberUser.model_validate(target_user),
+    )
 
 
 @router.delete("/characters/{character_id}/cast/{cast_id}", status_code=status.HTTP_204_NO_CONTENT)

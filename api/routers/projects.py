@@ -8,6 +8,7 @@ from db.session import get_db
 from models.projects import Episode, Project, ProjectMember, ProjectRole, Season
 from models.users import User, UserRole
 from routers.auth import require_admin, require_registered_user
+from schemas.auth import UserBrief
 from schemas.projects import (
     EpisodeCreate,
     EpisodeOut,
@@ -143,8 +144,25 @@ async def list_project_members(
     db: AsyncSession = Depends(get_db),
 ):
     project, _ = project_and_user
-    result = await db.execute(select(ProjectMember).where(ProjectMember.project_id == project.id))
-    return result.scalars().all()
+    # User bilan JOIN — Team UI'da ism/username ko'rsatish uchun frontend
+    # har bir a'zo uchun alohida so'rov yubormasin (N+1 oldini olish).
+    result = await db.execute(
+        select(ProjectMember, User)
+        .join(User, User.id == ProjectMember.user_id)
+        .where(ProjectMember.project_id == project.id)
+        .order_by(ProjectMember.role_in_project)
+    )
+    return [
+        ProjectMemberOut(
+            id=member.id,
+            project_id=member.project_id,
+            user_id=member.user_id,
+            role_in_project=member.role_in_project,
+            added_at=member.added_at,
+            user=UserBrief.model_validate(member_user),
+        )
+        for member, member_user in result.all()
+    ]
 
 
 @router.post("/projects/{project_id}/members", response_model=ProjectMemberOut, status_code=status.HTTP_201_CREATED)
@@ -172,7 +190,14 @@ async def add_project_member(
     db.add(member)
     await db.commit()
     await db.refresh(member)
-    return member
+    return ProjectMemberOut(
+        id=member.id,
+        project_id=member.project_id,
+        user_id=member.user_id,
+        role_in_project=member.role_in_project,
+        added_at=member.added_at,
+        user=UserBrief.model_validate(target_user),
+    )
 
 
 @router.delete("/projects/{project_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)

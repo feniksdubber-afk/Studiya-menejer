@@ -25,7 +25,7 @@ const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = [
   { value: "translator_extra", label: "Yordamchi tarjimon" },
   { value: "sound_main", label: "Bosh ovoz muharriri" },
   { value: "sound_extra", label: "Yordamchi ovoz muharriri" },
-};
+];
 
 function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean }) {
   const navigate = useNavigate();

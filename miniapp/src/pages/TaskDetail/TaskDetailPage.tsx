@@ -7,7 +7,7 @@ import { getDeadlineHistory, getTask, requestRevision, setTaskStatus } from "@/a
 import { getPublicConfig } from "@/api/config";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
-import { QueryError } from "@/components/StatusScreens";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/auth/useAuth";
@@ -81,7 +81,7 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
           className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
         />
       </div>
-      {error && <p className="text-xs text-red-500">Yuborib bo'lmadi. Qaytadan urinib ko'ring.</p>}
+      {error && <p className="text-xs text-role-voice-800 dark:text-role-voice-400">Yuborib bo'lmadi. Qaytadan urinib ko'ring.</p>}
       <div className="flex gap-2">
         <button
           type="button"
@@ -202,7 +202,7 @@ export default function TaskDetailPage() {
   }, [taskId, queryClient]);
 
   if (isLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
 
   if (isError || !task) {

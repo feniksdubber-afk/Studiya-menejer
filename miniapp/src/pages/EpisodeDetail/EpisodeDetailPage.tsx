@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getEpisode } from "@/api/projects";
 import { listEpisodeTasks } from "@/api/tasks";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
+import { Film } from "lucide-react";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
   translation: "Tarjima",
@@ -30,8 +31,10 @@ export default function EpisodeDetailPage() {
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
       <div>
-        <h1 className="text-lg font-semibold text-tg-text">🎞 {episode?.title ?? "..."}</h1>
-        {episode && <p className="text-xs text-tg-hint">{episode.status}</p>}
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
+          <Film size={18} aria-hidden="true" /> {episode?.title ?? "..."}
+        </h1>
+        {episode && <p className="font-mono text-xs text-tg-hint">{episode.status}</p>}
       </div>
 
       <div className="flex flex-col gap-2">

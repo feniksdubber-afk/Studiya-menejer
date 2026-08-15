@@ -58,7 +58,7 @@ def upgrade() -> None:
         ),
         sa.Column("poster_url", sa.String(1024)),
         sa.Column("anilist_id", sa.Integer),
-        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id")),
+        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
@@ -125,7 +125,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("is_active", sa.Boolean, server_default="true", nullable=False),
-        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id")),
+        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
@@ -176,7 +176,7 @@ def upgrade() -> None:
         sa.Column("old_deadline", sa.DateTime(timezone=True)),
         sa.Column("new_deadline", sa.DateTime(timezone=True)),
         sa.Column("reason", sa.Text),
-        sa.Column("changed_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("changed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
 
     # --- folders ---
@@ -187,7 +187,7 @@ def upgrade() -> None:
         sa.Column("parent_id", pg.UUID(as_uuid=True), sa.ForeignKey("folders.id", ondelete="CASCADE")),
         sa.Column("name", sa.String(256), nullable=False),
         sa.Column("is_default", sa.Boolean, server_default="false"),
-        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id")),
+        sa.Column("created_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
@@ -228,7 +228,7 @@ def upgrade() -> None:
         sa.Column("version_number", sa.Integer, nullable=False),
         sa.Column("telegram_file_id", sa.String(512), nullable=False),
         sa.Column("file_name", sa.String(512), nullable=False),
-        sa.Column("uploaded_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id")),
+        sa.Column("uploaded_by", pg.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("is_active", sa.Boolean, server_default="true", nullable=False),
         sa.Column(
             "status",

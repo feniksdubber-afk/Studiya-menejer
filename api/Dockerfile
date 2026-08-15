@@ -6,6 +6,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY api/ /app/
+COPY scripts/ /app/scripts/
 
 # alembic.ini script_location odatda "db/migrations" — WORKDIR /app bo'lgani
 # uchun ishlaydi, chunki api/ tarkibi to'g'ridan-to'g'ri /app ga ko'chirilgan.

@@ -34,6 +34,12 @@ class ProjectOut(BaseModel):
     created_by: uuid.UUID
     created_at: datetime
 
+    # Joriy foydalanuvchi AYNAN shu loyihada boshqarish huquqiga egami
+    # (admin/super_admin yoki shu loyihaning director_main/director_extra
+    # a'zosi). Frontend global user.role'ga emas, shu maydonga qarab UI
+    # ko'rsatishi kerak — router javob qaytarishda to'ldiradi.
+    can_manage: bool = False
+
     model_config = {"from_attributes": True}
 
 

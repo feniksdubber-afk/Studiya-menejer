@@ -43,6 +43,11 @@ class TaskOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Joriy foydalanuvchi shu vazifa bo'yicha imtiyozli amallarni
+    # (qabul qilish / qayta ishlashga qaytarish) bajara oladimi — admin,
+    # super_admin yoki shu loyihaning director_main/director_extra a'zosi.
+    can_manage: bool = False
+
     model_config = {"from_attributes": True}
 
 

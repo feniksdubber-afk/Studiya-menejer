@@ -35,6 +35,10 @@ class CharacterOut(BaseModel):
     # aks holda anilist_image_url). Router javob qaytarishda to'ldiradi.
     display_image_url: str | None = None
 
+    # Joriy foydalanuvchi shu personaj tegishli loyihada boshqarish huquqiga
+    # egami (qarang: ProjectOut.can_manage).
+    can_manage: bool = False
+
     model_config = {"from_attributes": True}
 
 

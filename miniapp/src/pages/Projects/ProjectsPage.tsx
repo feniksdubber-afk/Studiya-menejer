@@ -1,9 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import WebApp from "@twa-dev/sdk";
 import { createProject, listProjects } from "@/api/projects";
 import { searchAniList, type AniListSearchResult } from "@/api/anilist";
 import { useAuth } from "@/auth/useAuth";
+import { useToast } from "@/components/Toast";
+import { QueryError } from "@/components/StatusScreens";
 import { Sparkles, Tv, Clapperboard, Ghost, Film, Plus, X } from "lucide-react";
 import type { ProjectType } from "@/types";
 
@@ -23,13 +26,16 @@ const TYPE_OPTIONS: { value: ProjectType; label: string }[] = [
   { value: "other", label: "Boshqa" },
 ];
 
-let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const canCreate = user?.role === "director" || user?.is_admin || user?.is_super_admin;
+  // Komponent instansiyasiga bog'liq debounce vaqtlagichi — modul darajasidagi
+  // global o'zgaruvchidan farqli, boshqa instansiyalar bilan holat almashib
+  // ketmaydi.
+  const searchDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -42,7 +48,12 @@ export default function ProjectsPage() {
   const [searchResults, setSearchResults] = useState<AniListSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { data: projects, isLoading, isError } = useQuery({
+  const {
+    data: projects,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["projects"],
     queryFn: () => listProjects(false),
   });
@@ -57,11 +68,15 @@ export default function ProjectsPage() {
       }),
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Loyiha yaratildi.");
       resetForm();
       navigate(`/projects/${project.id}`);
     },
     onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
       setError("Loyihani yaratib bo'lmadi. Qaytadan urinib ko'ring.");
+      showError("Loyihani yaratib bo'lmadi.");
     },
   });
 
@@ -79,14 +94,14 @@ export default function ProjectsPage() {
   function handleSearchChange(value: string) {
     setSearchQuery(value);
     setAnilistId(null);
-    clearTimeout(searchDebounceTimer);
+    clearTimeout(searchDebounceTimer.current);
 
     if (value.trim().length < 2) {
       setSearchResults([]);
       return;
     }
 
-    searchDebounceTimer = setTimeout(async () => {
+    searchDebounceTimer.current = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results = await searchAniList(value.trim());
@@ -117,7 +132,13 @@ export default function ProjectsPage() {
   }
 
   if (isLoading) return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
-  if (isError) return <p className="p-5 text-sm text-red-600">Loyihalarni yuklab bo'lmadi.</p>;
+  if (isError) {
+    return (
+      <div className="p-5">
+        <QueryError message="Loyihalarni yuklab bo'lmadi." onRetry={() => refetch()} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
@@ -153,8 +174,9 @@ export default function ProjectsPage() {
           className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4"
         >
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-tg-hint">AniList'dan qidirish (ixtiyoriy)</label>
+            <label htmlFor="project-anilist-search" className="text-xs text-tg-hint">AniList'dan qidirish (ixtiyoriy)</label>
             <input
+              id="project-anilist-search"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Masalan: Naruto"
@@ -198,8 +220,9 @@ export default function ProjectsPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-tg-hint">Loyiha nomi</label>
+            <label htmlFor="project-title" className="text-xs text-tg-hint">Loyiha nomi</label>
             <input
+              id="project-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Masalan: Naruto"
@@ -232,8 +255,9 @@ export default function ProjectsPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-tg-hint">Poster URL (ixtiyoriy)</label>
+            <label htmlFor="project-poster-url" className="text-xs text-tg-hint">Poster URL (ixtiyoriy)</label>
             <input
+              id="project-poster-url"
               value={posterUrl}
               onChange={(e) => setPosterUrl(e.target.value)}
               placeholder="https://..."

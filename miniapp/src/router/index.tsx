@@ -8,6 +8,7 @@ import EpisodeDetailPage from "@/pages/EpisodeDetail/EpisodeDetailPage";
 import CharacterDetailPage from "@/pages/CharacterDetail/CharacterDetailPage";
 import TaskDetailPage from "@/pages/TaskDetail/TaskDetailPage";
 import ProfilePage from "@/pages/Profile/ProfilePage";
+import NotificationsPage from "@/pages/Notifications/NotificationsPage";
 import { RouteErrorBoundary } from "@/components/StatusScreens";
 import { NotFoundPage } from "@/pages/NotFound/NotFoundPage";
 
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: "/episodes/:episodeId", element: <EpisodeDetailPage /> },
       { path: "/characters/:characterId", element: <CharacterDetailPage /> },
       { path: "/profile", element: <ProfilePage /> },
+      { path: "/notifications", element: <NotificationsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

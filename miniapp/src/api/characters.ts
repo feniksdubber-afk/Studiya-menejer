@@ -6,6 +6,20 @@ export async function listCharacters(projectId: string): Promise<Character[]> {
   return data;
 }
 
+export interface CharacterCreatePayload {
+  name: string;
+  anilist_original_name?: string | null;
+  anilist_image_url?: string | null;
+}
+
+export async function createCharacter(
+  projectId: string,
+  payload: CharacterCreatePayload
+): Promise<Character> {
+  const { data } = await apiClient.post<Character>(`/projects/${projectId}/characters`, payload);
+  return data;
+}
+
 export async function getCharacter(characterId: string): Promise<Character> {
   const { data } = await apiClient.get<Character>(`/characters/${characterId}`);
   return data;

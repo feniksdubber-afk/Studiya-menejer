@@ -13,7 +13,7 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col gap-6 p-5 pt-8">
+    <div className="flex flex-col gap-6 p-5 pt-8 pb-20">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-tg-text">AFSONA DUB</h1>
         <p className="mt-1 text-sm text-tg-hint">Salom, {user?.first_name}</p>

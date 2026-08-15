@@ -12,7 +12,8 @@ import {
   uploadCharacterImage,
 } from "@/api/characters";
 import { Avatar } from "@/components/Avatar";
-import { QueryError } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
@@ -155,7 +156,7 @@ function AddActorForm({ characterId }: { characterId: string }) {
       )}
 
       {error && (
-        <p className="text-xs text-red-500">
+        <p className="text-xs text-role-voice-800 dark:text-role-voice-400">
           Aktyorni biriktirib bo'lmadi
           {selectedUser ? " — u allaqachon shu personajga biriktirilgan bo'lishi mumkin." : "."}
         </p>
@@ -223,6 +224,11 @@ export default function CharacterDetailPage() {
     mutationFn: () => deleteCharacterImage(characterId!),
     onSuccess: (updated) => {
       queryClient.setQueryData(["character", characterId], updated);
+      showSuccess("Rasm olib tashlandi.");
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Rasmni olib tashlab bo'lmadi.");
     },
   });
 
@@ -248,6 +254,7 @@ export default function CharacterDetailPage() {
 
   const {
     data: cast,
+    isLoading: isCastLoading,
     isError: isCastError,
     refetch: refetchCast,
   } = useQuery({
@@ -286,7 +293,7 @@ export default function CharacterDetailPage() {
   const removingCastId = isRemovingCast ? removingVars?.castId ?? null : null;
 
   if (isLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
 
   if (isError || !character) {
@@ -358,7 +365,7 @@ export default function CharacterDetailPage() {
       </div>
 
       {(uploadError || localFileError) && (
-        <div className="mx-5 -mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="mx-5 -mt-3 rounded-xl bg-role-voice-900/10 px-3 py-2 text-xs text-role-voice-800 dark:bg-role-voice-900/50 dark:text-role-voice-400">
           {localFileError
             ? localFileError
             : axios.isAxiosError(uploadError) && uploadError?.response?.data?.detail
@@ -384,14 +391,16 @@ export default function CharacterDetailPage() {
 
           {isCastError ? (
             <QueryError message="Aktyorlar ro'yxatini yuklab bo'lmadi." onRetry={() => refetchCast()} />
-          ) : mainCast.length === 0 && altCast.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl bg-tg-secondaryBg px-4 py-8 text-center">
-              <Mic2 size={22} className="text-tg-hint" aria-hidden="true" />
-              <p className="text-sm text-tg-hint">
-                Hali hech kim biriktirilmagan.
-                {canManage ? " Yuqoridagi tugma orqali aktyor qo'shing." : ""}
-              </p>
+          ) : isCastLoading ? (
+            <div className="flex flex-col gap-2">
+              <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+              <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
             </div>
+          ) : mainCast.length === 0 && altCast.length === 0 ? (
+            <EmptyState
+              icon={Mic2}
+              message={`Hali hech kim biriktirilmagan.${canManage ? " Yuqoridagi tugma orqali aktyor qo'shing." : ""}`}
+            />
           ) : (
             <div className="flex flex-col gap-2">
               {[...mainCast, ...altCast].map((c) => (
@@ -427,7 +436,7 @@ export default function CharacterDetailPage() {
                       aria-label="Aktyorni olib tashlash"
                       className="shrink-0 rounded-full p-1.5 text-tg-hint active:bg-tg-bg disabled:opacity-40"
                     >
-                      ✕
+                      <X size={13} aria-hidden="true" />
                     </button>
                   )}
                 </div>

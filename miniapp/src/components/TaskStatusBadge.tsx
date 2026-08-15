@@ -1,5 +1,5 @@
-import { CheckCircle2, Clock, RotateCcw, Send, AlertCircle } from "lucide-react";
-import type { TaskStatus } from "@/types";
+import { CheckCircle2, Clock, RotateCcw, Send, AlertCircle, PlayCircle, CircleDashed } from "lucide-react";
+import type { TaskStatus, EpisodeStatus } from "@/types";
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   revision_requested: "Qayta topshirish",
@@ -39,6 +39,45 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
     >
       <Icon size={13} strokeWidth={2.25} aria-hidden="true" />
       {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+const EPISODE_STATUS_LABEL: Record<EpisodeStatus, string> = {
+  not_started: "Boshlanmagan",
+  in_progress: "Jarayonda",
+  revision: "Qayta ko'rib chiqilmoqda",
+  ready: "Tayyor",
+  delayed: "Kechikkan",
+};
+
+const EPISODE_STATUS_ICON: Record<EpisodeStatus, typeof Clock> = {
+  not_started: CircleDashed,
+  in_progress: PlayCircle,
+  revision: RotateCcw,
+  ready: CheckCircle2,
+  delayed: AlertCircle,
+};
+
+// Qism statuslari uchun ham TaskStatusBadge bilan bir xil rol-rang tizimidan
+// foydalanamiz: tayyor = montaj (teal), jarayonda = tarjimon (indigo),
+// qayta ko'rib chiqilmoqda/kechikkan = ogohlantiruvchi ranglar.
+const EPISODE_STATUS_CLASS: Record<EpisodeStatus, string> = {
+  not_started: "bg-tg-secondaryBg text-tg-hint",
+  in_progress: "bg-role-translator-50 text-role-translator-800 dark:bg-role-translator-900/50 dark:text-role-translator-400",
+  revision: "bg-role-director-50 text-role-director-800 dark:bg-role-director-900/50 dark:text-role-director-400",
+  ready: "bg-role-sound-50 text-role-sound-800 dark:bg-role-sound-900/50 dark:text-role-sound-400",
+  delayed: "bg-role-voice-50 text-role-voice-800 dark:bg-role-voice-900/50 dark:text-role-voice-400",
+};
+
+export function EpisodeStatusBadge({ status }: { status: EpisodeStatus }) {
+  const Icon = EPISODE_STATUS_ICON[status];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${EPISODE_STATUS_CLASS[status]}`}
+    >
+      <Icon size={13} strokeWidth={2.25} aria-hidden="true" />
+      {EPISODE_STATUS_LABEL[status]}
     </span>
   );
 }

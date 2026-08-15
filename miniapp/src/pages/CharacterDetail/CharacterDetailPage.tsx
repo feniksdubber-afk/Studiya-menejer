@@ -19,7 +19,10 @@ import { useToast } from "@/components/Toast";
 import { Drama, Image, X, Mic2, Star } from "lucide-react";
 import type { CastType, CharacterCast, User } from "@/types";
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+// MUHIM: bu qiymat backend'dagi core/config.py:character_image_max_bytes
+// (5 MB) bilan bir xil bo'lishi shart. Mos kelmasa, foydalanuvchi frontend
+// tekshiruvidan o'tgan fayl serverdan tushunarsiz 422 xato bilan qaytadi.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const CAST_TYPE_META: Record<CastType, { label: string; badgeClass: string; icon: typeof Star | null }> = {
   main: { label: "Asosiy", badgeClass: "bg-role-sound-50 text-role-sound-800 dark:bg-role-sound-900/50 dark:text-role-sound-400", icon: Star },
@@ -236,7 +239,7 @@ export default function CharacterDetailPage() {
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setLocalFileError("Rasm hajmi 8 MB dan oshmasligi kerak.");
+      setLocalFileError("Rasm hajmi 5 MB dan oshmasligi kerak.");
       return;
     }
     setLocalFileError(null);
@@ -253,7 +256,7 @@ export default function CharacterDetailPage() {
     enabled: !!characterId,
   });
 
-  const { mutate: removeCast, variables: removingVars } = useMutation({
+  const { mutate: removeCast, variables: removingVars, isPending: isRemovingCast } = useMutation({
     mutationFn: ({ castId }: { castId: string }) => removeCharacterCast(characterId!, castId),
     onMutate: async ({ castId }) => {
       await queryClient.cancelQueries({ queryKey: ["character-cast", characterId] });
@@ -276,7 +279,11 @@ export default function CharacterDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["character-cast", characterId] });
     },
   });
-  const removingCastId = removingVars?.castId ?? null;
+  // MUHIM: faqat `variables`ga qarash yetarli emas — useMutation muvaffaqiyatsiz
+  // tugagandan keyin ham oxirgi chaqiruv argumentlarini saqlab turadi (reset()
+  // chaqirilmagunicha). `isPending` bilan birga tekshirmasak, xato (masalan
+  // tarmoq uzilishi) yuz berganda tugma abadiy disabled bo'lib qoladi.
+  const removingCastId = isRemovingCast ? removingVars?.castId ?? null : null;
 
   if (isLoading) {
     return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;

@@ -26,8 +26,13 @@ def _client():
 
 def build_object_key() -> str:
     """Har doim yangi tasodifiy nom — eski/yangi rasm kaliti hech qachon
-    ustma-ust tushmaydi (keshlash muammolarining oldini oladi)."""
-    return f"characters/{uuid.uuid4()}.webp"
+    ustma-ust tushmaydi (keshlash muammolarining oldini oladi).
+
+    Prefix "dub-characters/": bu R2 bucket AfsonaMovieBot bilan bo'lishilgan
+    (afsona-videos), shu sababli AFSONA DUB o'z obyektlarini alohida prefix
+    ostida saqlaydi — ikkala loyiha fayllari bir-biriga aralashmasligi uchun.
+    """
+    return f"dub-characters/{uuid.uuid4()}.webp"
 
 
 def upload_webp(key: str, data: bytes) -> None:

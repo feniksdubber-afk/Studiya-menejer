@@ -19,11 +19,13 @@ import {
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
 import { Avatar } from "@/components/Avatar";
-import { QueryError } from "@/components/StatusScreens";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
+import { EpisodeStatusBadge } from "@/components/TaskStatusBadge";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
-import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X } from "lucide-react";
+import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
 import type { Episode, ProjectMember, ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
@@ -148,12 +150,12 @@ function EpisodeRow({
     <div className="flex items-center gap-1 rounded-xl bg-tg-secondaryBg px-1 py-1">
       <button
         onClick={() => navigate(`/episodes/${episode.id}`)}
-        className="flex flex-1 items-center justify-between gap-2 px-2 py-1 text-left text-sm text-tg-text"
+        className="flex flex-1 items-center justify-between gap-2 px-2 py-1 text-left text-sm text-tg-text active:opacity-70"
       >
         <span className="flex items-center gap-1.5 truncate">
           <Film size={14} className="shrink-0 text-tg-hint" aria-hidden="true" /> {episode.title}
         </span>
-        <span className="shrink-0 font-mono text-xs text-tg-hint">{episode.status}</span>
+        <EpisodeStatusBadge status={episode.status} />
       </button>
       {canManage && (
         <div className="flex shrink-0 items-center gap-0.5">
@@ -200,6 +202,10 @@ function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean
       queryClient.invalidateQueries({ queryKey: ["episodes", season.id] });
       setEpisodeTitle("");
       setIsAddingEpisode(false);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Qismni qo'shib bo'lmadi.");
     },
   });
 
@@ -356,6 +362,7 @@ function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean
 
 function AddSeasonForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
+  const { showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -370,6 +377,10 @@ function AddSeasonForm({ projectId }: { projectId: string }) {
       queryClient.invalidateQueries({ queryKey: ["seasons", projectId] });
       setTitle("");
       setIsOpen(false);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Sezonni qo'shib bo'lmadi.");
     },
   });
 
@@ -549,7 +560,7 @@ function AddMemberForm({ projectId }: { projectId: string }) {
       )}
 
       {error && (
-        <p className="text-xs text-red-500">
+        <p className="text-xs text-role-voice-800 dark:text-role-voice-400">
           A'zo qo'shib bo'lmadi{selectedUser ? " — foydalanuvchi allaqachon jamoada bo'lishi mumkin." : "."}
         </p>
       )}
@@ -609,7 +620,7 @@ function MemberRow({
           aria-label="A'zoni olib tashlash"
           className="shrink-0 rounded-full p-1.5 text-tg-hint active:bg-tg-bg disabled:opacity-40"
         >
-          ✕
+          <X size={13} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -644,19 +655,19 @@ export default function ProjectDetailPage() {
   // boshqaruv tugmalari ko'rsatilmaydi.
   const canManage = project?.can_manage ?? false;
 
-  const { data: seasons } = useQuery({
+  const { data: seasons, isLoading: isSeasonsLoading } = useQuery({
     queryKey: ["seasons", projectId],
     queryFn: () => listSeasons(projectId!),
     enabled: !!projectId && tab === "seasons",
   });
 
-  const { data: characters } = useQuery({
+  const { data: characters, isLoading: isCharactersLoading } = useQuery({
     queryKey: ["characters", projectId],
     queryFn: () => listCharacters(projectId!),
     enabled: !!projectId && tab === "characters",
   });
 
-  const { data: members } = useQuery({
+  const { data: members, isLoading: isMembersLoading } = useQuery({
     queryKey: ["members", projectId],
     queryFn: () => listProjectMembers(projectId!),
     enabled: !!projectId && tab === "team",
@@ -721,6 +732,15 @@ export default function ProjectDetailPage() {
       setIsImportOpen(false);
       setSelectedIds(new Set());
     },
+    onError: () => {
+      // Ba'zi personajlar allaqachon yaratilgan bo'lishi mumkin (sikl
+      // o'rtasida to'xtagan) — shuning uchun ro'yxatni yangilaymiz, lekin
+      // tanlovni tozalamaymiz, foydalanuvchi qaysi biri o'tmaganini ko'rib
+      // qayta urinishi mumkin bo'lsin.
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Ba'zi personajlarni import qilib bo'lmadi. Qaytadan urinib ko'ring.");
+    },
   });
 
   function toggleSelected(id: number) {
@@ -738,7 +758,7 @@ export default function ProjectDetailPage() {
   const existingNames = new Set((characters ?? []).map((c) => c.anilist_original_name ?? c.name));
 
   if (isProjectLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
 
   if (isProjectError || !project) {
@@ -777,12 +797,17 @@ export default function ProjectDetailPage() {
       {tab === "seasons" && (
         <div className="flex flex-col gap-4">
           {canManage && projectId && <AddSeasonForm projectId={projectId} />}
-          {seasons?.length ? (
+          {isSeasonsLoading ? (
+            <div className="flex flex-col gap-2">
+              <div className="h-20 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+              <div className="h-20 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+            </div>
+          ) : seasons?.length ? (
             seasons.map((season) => (
               <SeasonBlock key={season.id} season={season} canManage={!!canManage} />
             ))
           ) : (
-            <p className="text-sm text-tg-hint">Sezonlar hali qo'shilmagan.</p>
+            <EmptyState icon={Folder} message="Sezonlar hali qo'shilmagan." />
           )}
         </div>
       )}
@@ -800,7 +825,11 @@ export default function ProjectDetailPage() {
 
           {isImportOpen && (
             <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3">
-              {isLoadingAniList && <p className="text-sm text-tg-hint">Yuklanmoqda...</p>}
+              {isLoadingAniList && (
+                <p className="flex items-center gap-1.5 text-sm text-tg-hint">
+                  <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Yuklanmoqda...
+                </p>
+              )}
               {!isLoadingAniList && aniListCharacters?.length === 0 && (
                 <p className="text-sm text-tg-hint">AniList'da personajlar topilmadi.</p>
               )}
@@ -848,12 +877,18 @@ export default function ProjectDetailPage() {
           )}
 
           <div className="grid grid-cols-3 gap-3">
-            {characters?.length ? (
+            {isCharactersLoading ? (
+              <>
+                <div className="h-16 w-16 animate-pulse rounded-full bg-tg-secondaryBg" />
+                <div className="h-16 w-16 animate-pulse rounded-full bg-tg-secondaryBg" />
+                <div className="h-16 w-16 animate-pulse rounded-full bg-tg-secondaryBg" />
+              </>
+            ) : characters?.length ? (
               characters.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => navigate(`/characters/${c.id}`)}
-                  className="flex flex-col items-center gap-1"
+                  className="flex flex-col items-center gap-1 active:opacity-70"
                 >
                   <div className="h-16 w-16 overflow-hidden rounded-full bg-tg-secondaryBg">
                     {c.display_image_url && (
@@ -864,7 +899,9 @@ export default function ProjectDetailPage() {
                 </button>
               ))
             ) : (
-              <p className="col-span-3 text-sm text-tg-hint">Personajlar hali qo'shilmagan.</p>
+              <div className="col-span-3">
+                <EmptyState icon={Film} message="Personajlar hali qo'shilmagan." />
+              </div>
             )}
           </div>
         </div>
@@ -874,7 +911,12 @@ export default function ProjectDetailPage() {
         <div className="flex flex-col gap-4">
           {canManage && projectId && <AddMemberForm projectId={projectId} />}
 
-          {members?.length ? (
+          {isMembersLoading ? (
+            <div className="flex flex-col gap-2">
+              <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+              <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+            </div>
+          ) : members?.length ? (
             CATEGORY_ORDER.map((cat) => {
               const meta = CATEGORY_META[cat];
               const group = members.filter((m) => ROLE_META[m.role_in_project].category === cat);
@@ -901,7 +943,7 @@ export default function ProjectDetailPage() {
               );
             })
           ) : (
-            <p className="text-sm text-tg-hint">Jamoa a'zolari hali qo'shilmagan.</p>
+            <EmptyState icon={Users} message="Jamoa a'zolari hali qo'shilmagan." />
           )}
         </div>
       )}

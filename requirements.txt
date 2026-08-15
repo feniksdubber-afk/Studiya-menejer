@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+alembic
+psycopg[binary]
+pydantic
+pydantic-settings
+python-multipart
+aiogram>=3.0
+boto3
+pillow
+python-dotenv
+pyjwt
+httpx

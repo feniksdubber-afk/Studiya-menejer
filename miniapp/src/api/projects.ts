@@ -61,6 +61,20 @@ export async function createSeason(projectId: string, payload: SeasonCreatePaylo
   return data;
 }
 
+export interface SeasonUpdatePayload {
+  title?: string;
+  order_index?: number;
+}
+
+export async function updateSeason(seasonId: string, payload: SeasonUpdatePayload): Promise<Season> {
+  const { data } = await apiClient.patch<Season>(`/seasons/${seasonId}`, payload);
+  return data;
+}
+
+export async function deleteSeason(seasonId: string): Promise<void> {
+  await apiClient.delete(`/seasons/${seasonId}`);
+}
+
 export async function listEpisodes(seasonId: string): Promise<Episode[]> {
   const { data } = await apiClient.get<Episode[]>(`/seasons/${seasonId}/episodes`);
   return data;
@@ -79,4 +93,18 @@ export async function createEpisode(seasonId: string, payload: EpisodeCreatePayl
 export async function getEpisode(episodeId: string): Promise<Episode> {
   const { data } = await apiClient.get<Episode>(`/episodes/${episodeId}`);
   return data;
+}
+
+export interface EpisodeUpdatePayload {
+  title?: string;
+  order_index?: number;
+}
+
+export async function updateEpisode(episodeId: string, payload: EpisodeUpdatePayload): Promise<Episode> {
+  const { data } = await apiClient.patch<Episode>(`/episodes/${episodeId}`, payload);
+  return data;
+}
+
+export async function deleteEpisode(episodeId: string): Promise<void> {
+  await apiClient.delete(`/episodes/${episodeId}`);
 }

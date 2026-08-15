@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getEpisode } from "@/api/projects";
 import { listEpisodeTasks } from "@/api/tasks";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
+import { QueryError } from "@/components/StatusScreens";
+import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Film } from "lucide-react";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
@@ -15,18 +17,40 @@ const TASK_TYPE_LABEL: Record<string, string> = {
 export default function EpisodeDetailPage() {
   const { episodeId } = useParams<{ episodeId: string }>();
   const navigate = useNavigate();
+  useTelegramBackButton("/projects");
 
-  const { data: episode } = useQuery({
+  const {
+    data: episode,
+    isLoading: isEpisodeLoading,
+    isError: isEpisodeError,
+    refetch: refetchEpisode,
+  } = useQuery({
     queryKey: ["episode", episodeId],
     queryFn: () => getEpisode(episodeId!),
     enabled: !!episodeId,
   });
 
-  const { data: tasks } = useQuery({
+  const {
+    data: tasks,
+    isError: isTasksError,
+    refetch: refetchTasks,
+  } = useQuery({
     queryKey: ["episode-tasks", episodeId],
     queryFn: () => listEpisodeTasks(episodeId!),
     enabled: !!episodeId,
   });
+
+  if (isEpisodeLoading) {
+    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+  }
+
+  if (isEpisodeError) {
+    return (
+      <div className="p-5">
+        <QueryError message="Qismni yuklab bo'lmadi." onRetry={() => refetchEpisode()} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
@@ -38,7 +62,9 @@ export default function EpisodeDetailPage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {tasks?.length ? (
+        {isTasksError ? (
+          <QueryError message="Vazifalarni yuklab bo'lmadi." onRetry={() => refetchTasks()} />
+        ) : tasks?.length ? (
           tasks.map((task) => (
             <button
               key={task.id}

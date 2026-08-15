@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +16,13 @@ class Notification(Base, TimestampMixin):
     type: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    # `is_read` "foydalanuvchi Mini App'da ko'rdimi" degan ma'noni bildiradi
+    # (hozircha Mini App'da bildirishnomalar markazi yo'q, shuning uchun
+    # bu maydon hali ishlatilmayapti). `pushed_at` esa mutlaqo boshqa
+    # narsa — Telegram orqali push xabar allaqachon yuborilganmi (bot/
+    # services/notification_pusher.py). Ikkalasini bitta boolean bilan
+    # ifodalash noto'g'ri bo'lardi, shuning uchun alohida ustun qo'shildi.
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Comment(Base, TimestampMixin):

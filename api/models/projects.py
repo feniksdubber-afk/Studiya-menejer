@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -59,6 +59,14 @@ class ProjectMember(Base):
     # kelgan, lekin ustunning o'zi yaratilmagan edi — a'zolar ro'yxatini olish
     # amalda xato bilan tugardi. 0004 migratsiyasi shu ustunni qo'shadi.
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Avval faqat "avval tekshir, keyin qo'sh" (get_membership) usuli bilan
+    # himoyalangan edi -- bu race condition'ga yo'l qo'yardi (ikki tez-tez
+    # so'rov bir foydalanuvchini ikki marta a'zo qilib qo'yishi mumkin edi).
+    # 0005 migratsiyasi DB darajasidagi unique constraint qo'shadi.
+    __table_args__ = (
+        UniqueConstraint("project_id", "user_id", name="uq_project_members_project_user"),
+    )
 
 
 class Season(Base):

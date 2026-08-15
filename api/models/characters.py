@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,3 +46,10 @@ class CharacterCast(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     cast_type: Mapped[CastType] = mapped_column(Enum(CastType, name="cast_type"), nullable=False)
+
+    # project_members bilan bir xil muammo: faqat "avval tekshir, keyin
+    # qo'sh" bilan himoyalangan edi (routers/characters.py). 0005
+    # migratsiyasi DB darajasidagi unique constraint qo'shadi.
+    __table_args__ = (
+        UniqueConstraint("character_id", "user_id", name="uq_character_cast_character_user"),
+    )

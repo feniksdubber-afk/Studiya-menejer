@@ -1,5 +1,6 @@
-import { CircleUserRound, Check } from "lucide-react";
+import { CircleUserRound, Check, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { Avatar } from "@/components/Avatar";
 
 const ROLE_LABEL: Record<string, string> = {
   director: "Rejissyor",
@@ -18,28 +19,35 @@ export default function ProfilePage() {
         <CircleUserRound size={20} aria-hidden="true" /> Profil
       </h1>
 
-      <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-4 text-sm">
-        <div className="flex justify-between">
-          <span className="text-tg-hint">Ism</span>
-          <span className="text-tg-text">
+      <div className="flex items-center gap-3 rounded-2xl bg-tg-secondaryBg p-4">
+        <Avatar firstName={user.first_name} lastName={user.last_name} size="lg" />
+        <div className="flex flex-col">
+          <span className="text-base font-semibold text-tg-text">
             {user.first_name} {user.last_name ?? ""}
           </span>
+          {user.telegram_username && (
+            <span className="text-sm text-tg-hint">@{user.telegram_username}</span>
+          )}
         </div>
-        {user.telegram_username && (
-          <div className="flex justify-between">
-            <span className="text-tg-hint">Username</span>
-            <span className="text-tg-text">@{user.telegram_username}</span>
-          </div>
-        )}
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-4 text-sm">
         <div className="flex justify-between">
           <span className="text-tg-hint">Rol</span>
           <span className="text-tg-text">{user.role ? ROLE_LABEL[user.role] : "—"}</span>
         </div>
-        {user.is_admin && (
-          <div className="flex justify-between">
-            <span className="text-tg-hint">Admin</span>
-            <Check size={16} className="text-role-sound-600" aria-hidden="true" />
+        {user.is_super_admin ? (
+          <div className="flex items-center justify-between">
+            <span className="text-tg-hint">Super admin</span>
+            <ShieldCheck size={16} className="text-role-sound-600" aria-hidden="true" />
           </div>
+        ) : (
+          user.is_admin && (
+            <div className="flex items-center justify-between">
+              <span className="text-tg-hint">Admin</span>
+              <Check size={16} className="text-role-sound-600" aria-hidden="true" />
+            </div>
+          )
         )}
       </div>
     </div>

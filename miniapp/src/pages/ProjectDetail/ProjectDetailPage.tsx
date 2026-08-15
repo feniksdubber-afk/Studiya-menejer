@@ -15,6 +15,9 @@ import {
   deleteEpisode,
   addProjectMember,
   removeProjectMember,
+  updateProject,
+  archiveProject,
+  unarchiveProject,
 } from "@/api/projects";
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
@@ -25,8 +28,8 @@ import { EpisodeStatusBadge } from "@/components/TaskStatusBadge";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
-import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
-import type { Episode, ProjectMember, ProjectRole, Season, User } from "@/types";
+import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X, Loader2, Archive, ArchiveRestore, Image } from "lucide-react";
+import type { Episode, Project, ProjectMember, ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
 type RoleCategory = "director" | "translator" | "voice_actor" | "sound";
@@ -627,6 +630,175 @@ function MemberRow({
   );
 }
 
+function ProjectHeader({
+  project,
+  canManage,
+}: {
+  project: Project;
+  canManage: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(project.title);
+  const [posterUrl, setPosterUrl] = useState(project.poster_url ?? "");
+
+  function resetFields() {
+    setTitle(project.title);
+    setPosterUrl(project.poster_url ?? "");
+  }
+
+  const { mutate: save, isPending: isSaving } = useMutation({
+    mutationFn: () =>
+      updateProject(project.id, {
+        title: title.trim(),
+        poster_url: posterUrl.trim() ? posterUrl.trim() : null,
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["project", project.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      showSuccess("Loyiha yangilandi.");
+      setIsEditing(false);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Loyihani yangilab bo'lmadi.");
+    },
+  });
+
+  const { mutate: toggleArchive, isPending: isTogglingArchive } = useMutation({
+    mutationFn: () =>
+      project.is_archived ? unarchiveProject(project.id) : archiveProject(project.id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["project", project.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess(updated.is_archived ? "Loyiha arxivlandi." : "Loyiha arxivdan qaytarildi.");
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Amalni bajarib bo'lmadi.");
+    },
+  });
+
+  function handleSave(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) {
+      resetFields();
+      setIsEditing(false);
+      return;
+    }
+    if (title.trim() === project.title && posterUrl.trim() === (project.poster_url ?? "")) {
+      setIsEditing(false);
+      return;
+    }
+    save();
+  }
+
+  function handleToggleArchive() {
+    const message = project.is_archived
+      ? `"${project.title}" loyihasini arxivdan qaytarmoqchimisiz?`
+      : `"${project.title}" loyihasini arxivlamoqchimisiz? Loyiha ro'yxatda ko'rinmay qoladi, lekin ma'lumotlar saqlanib qoladi.`;
+    WebApp.showConfirm(message, (ok) => {
+      if (ok) toggleArchive();
+    });
+  }
+
+  if (isEditing) {
+    return (
+      <form onSubmit={handleSave} className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-tg-hint">Loyiha nomi</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            className="rounded-lg bg-tg-bg px-2.5 py-1.5 text-sm text-tg-text outline-none"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-tg-hint">Poster URL</span>
+          <input
+            value={posterUrl}
+            onChange={(e) => setPosterUrl(e.target.value)}
+            placeholder="https://..."
+            className="rounded-lg bg-tg-bg px-2.5 py-1.5 text-sm text-tg-text outline-none"
+          />
+        </label>
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText disabled:opacity-60"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
+            Saqlash
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetFields();
+              setIsEditing(false);
+            }}
+            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm text-tg-hint active:bg-tg-bg"
+          >
+            <X size={14} aria-hidden="true" />
+            Bekor qilish
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <h1 className="truncate text-lg font-semibold text-tg-text">{project.title}</h1>
+          {project.is_archived && (
+            <span className="shrink-0 rounded-full bg-tg-secondaryBg px-2 py-0.5 text-[11px] font-medium text-tg-hint">
+              Arxivlangan
+            </span>
+          )}
+        </div>
+        {project.poster_url && (
+          <span className="flex items-center gap-1 truncate text-xs text-tg-hint">
+            <Image size={12} className="shrink-0" aria-hidden="true" />
+            {project.poster_url}
+          </span>
+        )}
+      </div>
+      {canManage && (
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            aria-label="Loyihani tahrirlash"
+            className="rounded-full p-1.5 text-tg-hint active:bg-tg-secondaryBg"
+          >
+            <Pencil size={15} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleArchive}
+            disabled={isTogglingArchive}
+            aria-label={project.is_archived ? "Arxivdan qaytarish" : "Arxivlash"}
+            className="rounded-full p-1.5 text-tg-hint active:bg-tg-secondaryBg disabled:opacity-40"
+          >
+            {isTogglingArchive ? (
+              <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+            ) : project.is_archived ? (
+              <ArchiveRestore size={15} aria-hidden="true" />
+            ) : (
+              <Archive size={15} aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -771,7 +943,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
-      <h1 className="text-lg font-semibold text-tg-text">{project.title}</h1>
+      <ProjectHeader project={project} canManage={!!canManage} />
 
       <div className="flex gap-2 rounded-xl bg-tg-secondaryBg p-1">
         {(

@@ -1,0 +1,367 @@
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.session import get_db
+from models.projects import Episode, Project, ProjectMember, ProjectRole, Season
+from models.users import User, UserRole
+from routers.auth import require_admin, require_registered_user
+from schemas.projects import (
+    EpisodeCreate,
+    EpisodeOut,
+    EpisodeUpdate,
+    ProjectCreate,
+    ProjectMemberAdd,
+    ProjectMemberOut,
+    ProjectOut,
+    ProjectUpdate,
+    SeasonCreate,
+    SeasonOut,
+    SeasonUpdate,
+)
+from services.permissions import (
+    get_membership,
+    get_project_or_404,
+    project_director_access,
+    project_view_access,
+    require_project_director,
+)
+router = APIRouter(tags=["projects"])
+
+
+# ==================== PROJECTS ====================
+
+@router.post("/projects", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
+async def create_project(
+    payload: ProjectCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    """Loyiha yaratish — faqat rejissyor (role=director) yoki admin."""
+    if not (user.role == UserRole.director or user.is_admin or user.is_super_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Faqat rejissyor yoki admin loyiha yarata oladi",
+        )
+
+    project = Project(
+        id=uuid.uuid4(),
+        title=payload.title,
+        type=payload.type,
+        poster_url=payload.poster_url,
+        anilist_id=payload.anilist_id,
+        created_by=user.id,
+    )
+    db.add(project)
+    await db.flush()
+
+    # Yaratuvchi avtomatik director_main sifatida a'zo bo'ladi (agar rejissyor bo'lsa)
+    if user.role == UserRole.director:
+        db.add(
+            ProjectMember(
+                id=uuid.uuid4(),
+                project_id=project.id,
+                user_id=user.id,
+                role_in_project=ProjectRole.director_main,
+            )
+        )
+
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.get("/projects", response_model=list[ProjectOut])
+async def list_projects(
+    include_archived: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    query = select(Project)
+    if not include_archived:
+        query = query.where(Project.is_archived.is_(False))
+    query = query.order_by(Project.created_at.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/projects/{project_id}", response_model=ProjectOut)
+async def get_project(
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    return await get_project_or_404(project_id, db)
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
+async def update_project(
+    payload: ProjectUpdate,
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(project, field, value)
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.post("/projects/{project_id}/archive", response_model=ProjectOut)
+async def archive_project(
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    project.is_archived = True
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.post("/projects/{project_id}/unarchive", response_model=ProjectOut)
+async def unarchive_project(
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    project.is_archived = False
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+# ==================== PROJECT MEMBERS ====================
+
+@router.get("/projects/{project_id}/members", response_model=list[ProjectMemberOut])
+async def list_project_members(
+    project_and_user: tuple[Project, User] = Depends(project_view_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    result = await db.execute(select(ProjectMember).where(ProjectMember.project_id == project.id))
+    return result.scalars().all()
+
+
+@router.post("/projects/{project_id}/members", response_model=ProjectMemberOut, status_code=status.HTTP_201_CREATED)
+async def add_project_member(
+    payload: ProjectMemberAdd,
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+
+    target_user = await db.get(User, payload.user_id)
+    if target_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+    existing = await get_membership(db, project.id, payload.user_id)
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Foydalanuvchi allaqachon a'zo")
+
+    member = ProjectMember(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        user_id=payload.user_id,
+        role_in_project=payload.role_in_project,
+    )
+    db.add(member)
+    await db.commit()
+    await db.refresh(member)
+    return member
+
+
+@router.delete("/projects/{project_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_project_member(
+    member_id: uuid.UUID,
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    member = await db.get(ProjectMember, member_id)
+    if member is None or member.project_id != project.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="A'zolik topilmadi")
+    await db.delete(member)
+    await db.commit()
+
+
+# ==================== SEASONS ====================
+
+@router.get("/projects/{project_id}/seasons", response_model=list[SeasonOut])
+async def list_seasons(
+    project_and_user: tuple[Project, User] = Depends(project_view_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    result = await db.execute(
+        select(Season).where(Season.project_id == project.id).order_by(Season.order_index)
+    )
+    return result.scalars().all()
+
+
+@router.post("/projects/{project_id}/seasons", response_model=SeasonOut, status_code=status.HTTP_201_CREATED)
+async def create_season(
+    payload: SeasonCreate,
+    project_and_user: tuple[Project, User] = Depends(project_director_access),
+    db: AsyncSession = Depends(get_db),
+):
+    project, _ = project_and_user
+    season = Season(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        title=payload.title,
+        order_index=payload.order_index,
+        anilist_season_id=payload.anilist_season_id,
+    )
+    db.add(season)
+    await db.commit()
+    await db.refresh(season)
+    return season
+
+
+async def _get_season_or_404(db: AsyncSession, season_id: uuid.UUID) -> Season:
+    season = await db.get(Season, season_id)
+    if season is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sezon topilmadi")
+    return season
+
+
+@router.patch("/seasons/{season_id}", response_model=SeasonOut)
+async def update_season(
+    season_id: uuid.UUID,
+    payload: SeasonUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    season = await _get_season_or_404(db, season_id)
+    project = await get_project_or_404(season.project_id, db)
+    await require_project_director(project, user, db)
+
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(season, field, value)
+    await db.commit()
+    await db.refresh(season)
+    return season
+
+
+@router.delete("/seasons/{season_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_season(
+    season_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    season = await _get_season_or_404(db, season_id)
+    project = await get_project_or_404(season.project_id, db)
+    await require_project_director(project, user, db)
+    await db.delete(season)  # CASCADE -> episodes
+    await db.commit()
+
+
+# ==================== EPISODES ====================
+
+@router.get("/seasons/{season_id}/episodes", response_model=list[EpisodeOut])
+async def list_episodes(
+    season_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    season = await _get_season_or_404(db, season_id)
+    # Ko'rish uchun loyiha a'zoligini tekshiramiz (admin bo'lmasa)
+    project = await get_project_or_404(season.project_id, db)
+    if not (user.is_admin or user.is_super_admin):
+        membership = await get_membership(db, project.id, user.id)
+        if membership is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu loyiha a'zosi emassiz")
+
+    result = await db.execute(
+        select(Episode).where(Episode.season_id == season_id).order_by(Episode.order_index)
+    )
+    return result.scalars().all()
+
+
+@router.post("/seasons/{season_id}/episodes", response_model=EpisodeOut, status_code=status.HTTP_201_CREATED)
+async def create_episode(
+    season_id: uuid.UUID,
+    payload: EpisodeCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    season = await _get_season_or_404(db, season_id)
+    project = await get_project_or_404(season.project_id, db)
+    await require_project_director(project, user, db)
+
+    episode = Episode(
+        id=uuid.uuid4(),
+        season_id=season_id,
+        title=payload.title,
+        order_index=payload.order_index,
+    )
+    db.add(episode)
+    await db.commit()
+    await db.refresh(episode)
+    return episode
+
+
+async def _get_episode_or_404(db: AsyncSession, episode_id: uuid.UUID) -> Episode:
+    episode = await db.get(Episode, episode_id)
+    if episode is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Qism topilmadi")
+    return episode
+
+
+@router.get("/episodes/{episode_id}", response_model=EpisodeOut)
+async def get_episode(
+    episode_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    episode = await _get_episode_or_404(db, episode_id)
+    season = await _get_season_or_404(db, episode.season_id)
+    if not (user.is_admin or user.is_super_admin):
+        membership = await get_membership(db, season.project_id, user.id)
+        if membership is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu loyiha a'zosi emassiz")
+    return episode
+
+
+@router.patch("/episodes/{episode_id}", response_model=EpisodeOut)
+async def update_episode(
+    episode_id: uuid.UUID,
+    payload: EpisodeUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    episode = await _get_episode_or_404(db, episode_id)
+    season = await _get_season_or_404(db, episode.season_id)
+    project = await get_project_or_404(season.project_id, db)
+    await require_project_director(project, user, db)
+
+    data = payload.model_dump(exclude_unset=True)
+    manual_status = data.pop("status", None)
+    for field, value in data.items():
+        setattr(episode, field, value)
+    if manual_status is not None:
+        # Qo'lda status override — kamdan-kam, favqulodda holatlar uchun.
+        episode.status = manual_status
+    await db.commit()
+    await db.refresh(episode)
+    return episode
+
+
+@router.delete("/episodes/{episode_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_episode(
+    episode_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    episode = await _get_episode_or_404(db, episode_id)
+    season = await _get_season_or_404(db, episode.season_id)
+    project = await get_project_or_404(season.project_id, db)
+    await require_project_director(project, user, db)
+    await db.delete(episode)
+    await db.commit()

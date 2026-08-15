@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
@@ -7,6 +7,9 @@ import { getDeadlineHistory, getTask, requestRevision, setTaskStatus } from "@/a
 import { getPublicConfig } from "@/api/config";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
+import { QueryError } from "@/components/StatusScreens";
+import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
+import { useToast } from "@/components/Toast";
 import { useAuth } from "@/auth/useAuth";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
@@ -18,6 +21,7 @@ const TASK_TYPE_LABEL: Record<string, string> = {
 
 function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
+  const { showSuccess } = useToast();
   const [reason, setReason] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
 
@@ -31,7 +35,12 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task", taskId] });
       queryClient.invalidateQueries({ queryKey: ["deadline-history", taskId] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Vazifa qayta ishlashga qaytarildi.");
       onDone();
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
     },
   });
 
@@ -47,8 +56,11 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
       className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4"
     >
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-tg-hint">Qaytarish sababi</label>
+        <label htmlFor="revision-reason" className="text-xs font-medium text-tg-hint">
+          Qaytarish sababi
+        </label>
         <textarea
+          id="revision-reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Nima to'g'irlanishi kerak?"
@@ -58,8 +70,11 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-tg-hint">Yangi deadline (ixtiyoriy)</label>
+        <label htmlFor="revision-deadline" className="text-xs font-medium text-tg-hint">
+          Yangi deadline (ixtiyoriy)
+        </label>
         <input
+          id="revision-deadline"
           type="datetime-local"
           value={newDeadline}
           onChange={(e) => setNewDeadline(e.target.value)}
@@ -88,10 +103,16 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
 }
 
 function DeadlineHistorySection({ taskId }: { taskId: string }) {
-  const { data: history } = useQuery({
+  const { data: history, isError, refetch } = useQuery({
     queryKey: ["deadline-history", taskId],
     queryFn: () => getDeadlineHistory(taskId),
   });
+
+  if (isError) {
+    return (
+      <QueryError message="Deadline tarixini yuklab bo'lmadi." onRetry={() => refetch()} />
+    );
+  }
 
   if (!history || history.length === 0) return null;
 
@@ -123,9 +144,11 @@ export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [isRejecting, setIsRejecting] = useState(false);
+  useTelegramBackButton("/tasks");
 
-  const { data: task, isLoading } = useQuery({
+  const { data: task, isLoading, isError, refetch } = useQuery({
     queryKey: ["task", taskId],
     queryFn: () => getTask(taskId!),
     enabled: !!taskId,
@@ -142,11 +165,52 @@ export default function TaskDetailPage() {
 
   const acceptMutation = useMutation({
     mutationFn: () => setTaskStatus(taskId!, "accepted"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task", taskId] }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      const previous = queryClient.getQueryData<typeof task>(["task", taskId]);
+      queryClient.setQueryData(["task", taskId], (old: typeof task) =>
+        old ? { ...old, status: "accepted" as const } : old
+      );
+      return { previous };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Vazifa qabul qilindi.");
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["task", taskId], context.previous);
+      }
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Vazifani qabul qilib bo'lmadi.");
+    },
   });
 
-  if (isLoading || !task) {
+  // Foydalanuvchi faylni bot orqali topshirish uchun Telegram'ga chiqib
+  // qaytganda (Mini App fon/old planga qaytishi), vazifa holatini qayta
+  // so'raymiz — aks holda ekranda eskirgan status ko'rinib qolishi mumkin.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "visible" && taskId) {
+        queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+        queryClient.invalidateQueries({ queryKey: ["deadline-history", taskId] });
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [taskId, queryClient]);
+
+  if (isLoading) {
     return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+  }
+
+  if (isError || !task) {
+    return (
+      <div className="p-5">
+        <QueryError message="Vazifani yuklab bo'lmadi." onRetry={() => refetch()} />
+      </div>
+    );
   }
 
   const isAssignee = task.assigned_to === user?.id;
@@ -160,6 +224,7 @@ export default function TaskDetailPage() {
 
   function openSubmissionInBot() {
     if (!config?.bot_username || !task) return;
+    WebApp.HapticFeedback.impactOccurred("light");
     // Bot /start task_<id> ni oladi -> u yerda to'liq avtorizatsiya zanjiri
     // qayta tekshiriladi (bot task_id'ning o'zini yetarli deb hisoblamaydi).
     const link = `https://t.me/${config.bot_username}?start=task_${task.id}`;
@@ -196,7 +261,7 @@ export default function TaskDetailPage() {
       </div>
 
       {task.status === "revision_requested" && task.revision_reason && (
-        <div className="rounded-2xl bg-role-director-50 p-4 text-sm text-role-director-800">
+        <div className="rounded-2xl bg-role-director-50 p-4 text-sm text-role-director-800 dark:bg-role-director-900/50 dark:text-role-director-400">
           <p className="font-medium">Qayta topshirish sababi:</p>
           <p className="mt-1">{task.revision_reason}</p>
         </div>
@@ -225,7 +290,10 @@ export default function TaskDetailPage() {
           )}
           {canReject && (
             <button
-              onClick={() => setIsRejecting(true)}
+              onClick={() => {
+                WebApp.HapticFeedback.impactOccurred("light");
+                setIsRejecting(true);
+              }}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-role-director-600 px-4 py-3 text-sm font-medium text-white"
             >
               <RotateCcw size={16} aria-hidden="true" /> Qaytarish

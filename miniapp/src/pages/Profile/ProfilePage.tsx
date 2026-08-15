@@ -1,3 +1,4 @@
+import { CircleUserRound, Check } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -13,7 +14,9 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
-      <h1 className="text-lg font-semibold text-tg-text">👤 Profil</h1>
+      <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
+        <CircleUserRound size={20} aria-hidden="true" /> Profil
+      </h1>
 
       <div className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-4 text-sm">
         <div className="flex justify-between">
@@ -35,7 +38,7 @@ export default function ProfilePage() {
         {user.is_admin && (
           <div className="flex justify-between">
             <span className="text-tg-hint">Admin</span>
-            <span className="text-tg-text">✅</span>
+            <Check size={16} className="text-role-sound-600" aria-hidden="true" />
           </div>
         )}
       </div>

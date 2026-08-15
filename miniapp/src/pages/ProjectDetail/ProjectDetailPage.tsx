@@ -15,6 +15,7 @@ import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
 import { searchUsers } from "@/api/users";
 import { Avatar } from "@/components/Avatar";
+import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film } from "lucide-react";
 import type { ProjectMember, ProjectRole, Season, User } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
@@ -33,11 +34,14 @@ const ROLE_META: Record<ProjectRole, { label: string; category: RoleCategory }> 
   sound_extra: { label: "Yordamchi ovoz muharriri", category: "sound" },
 };
 
-const CATEGORY_META: Record<RoleCategory, { title: string; icon: string; badgeClass: string }> = {
-  director: { title: "Rejissyorlar", icon: "🎬", badgeClass: "bg-violet-100 text-violet-700" },
-  translator: { title: "Tarjimonlar", icon: "📝", badgeClass: "bg-sky-100 text-sky-700" },
-  voice_actor: { title: "Ovoz aktyorlari", icon: "🎙️", badgeClass: "bg-emerald-100 text-emerald-700" },
-  sound: { title: "Svedeniyachilar", icon: "🎧", badgeClass: "bg-amber-100 text-amber-700" },
+const CATEGORY_META: Record<
+  RoleCategory,
+  { title: string; icon: typeof Clapperboard; badgeClass: string }
+> = {
+  director: { title: "Rejissyorlar", icon: Clapperboard, badgeClass: "bg-role-director-50 text-role-director-800" },
+  translator: { title: "Tarjimonlar", icon: Languages, badgeClass: "bg-role-translator-50 text-role-translator-800" },
+  voice_actor: { title: "Ovoz aktyorlari", icon: Mic2, badgeClass: "bg-role-voice-50 text-role-voice-800" },
+  sound: { title: "Svedeniyachilar", icon: AudioWaveform, badgeClass: "bg-role-sound-50 text-role-sound-800" },
 };
 
 const CATEGORY_ORDER: RoleCategory[] = ["director", "translator", "voice_actor", "sound"];
@@ -75,7 +79,9 @@ function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium text-tg-text">📁 {season.title}</p>
+      <p className="flex items-center gap-1.5 text-sm font-medium text-tg-text">
+        <Folder size={15} className="text-tg-hint" aria-hidden="true" /> {season.title}
+      </p>
       <div className="flex flex-col gap-1 pl-4">
         {episodes?.map((ep) => (
           <button
@@ -83,8 +89,10 @@ function SeasonBlock({ season, canManage }: { season: Season; canManage: boolean
             onClick={() => navigate(`/episodes/${ep.id}`)}
             className="flex items-center justify-between rounded-xl bg-tg-secondaryBg px-3 py-2 text-left text-sm text-tg-text"
           >
-            <span>🎞 {ep.title}</span>
-            <span className="text-xs text-tg-hint">{ep.status}</span>
+            <span className="flex items-center gap-1.5">
+              <Film size={14} className="text-tg-hint" aria-hidden="true" /> {ep.title}
+            </span>
+            <span className="font-mono text-xs text-tg-hint">{ep.status}</span>
           </button>
         ))}
 
@@ -290,8 +298,8 @@ function AddMemberForm({ projectId }: { projectId: string }) {
             const options = ROLE_OPTIONS.filter((opt) => ROLE_META[opt.value].category === cat);
             return (
               <div key={cat} className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium text-tg-hint">
-                  {meta.icon} {meta.title}
+                <span className="flex items-center gap-1 text-[11px] font-medium text-tg-hint">
+                  <meta.icon size={12} aria-hidden="true" /> {meta.title}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {options.map((opt) => (
@@ -478,18 +486,19 @@ export default function ProjectDetailPage() {
       <div className="flex gap-2 rounded-xl bg-tg-secondaryBg p-1">
         {(
           [
-            ["seasons", "📁 Seasons"],
-            ["characters", "🎭 Characters"],
-            ["team", "👥 Team"],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
+            ["seasons", "Sezonlar", Folder],
+            ["characters", "Personajlar", Film],
+            ["team", "Jamoa", Users],
+          ] as [Tab, string, typeof Folder][]
+        ).map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 rounded-lg py-1.5 text-xs font-medium ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium ${
               tab === key ? "bg-tg-bg text-tg-text" : "text-tg-hint"
             }`}
           >
+            <Icon size={14} aria-hidden="true" />
             {label}
           </button>
         ))}
@@ -515,7 +524,7 @@ export default function ProjectDetailPage() {
               onClick={() => setIsImportOpen((open) => !open)}
               className="self-start rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
             >
-              {isImportOpen ? "Yopish" : "🎭 AniList'dan import qilish"}
+              {isImportOpen ? "Yopish" : "AniList'dan import qilish"}
             </button>
           )}
 
@@ -602,8 +611,8 @@ export default function ProjectDetailPage() {
               if (group.length === 0) return null;
               return (
                 <section key={cat} className="flex flex-col gap-2">
-                  <h2 className="text-sm font-medium text-tg-hint">
-                    {meta.icon} {meta.title} · {group.length}
+                  <h2 className="flex items-center gap-1.5 text-sm font-medium text-tg-hint">
+                    <meta.icon size={14} aria-hidden="true" /> {meta.title} · {group.length}
                   </h2>
                   <div className="flex flex-col gap-2">
                     {group.map((m) => (

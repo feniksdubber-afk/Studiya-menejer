@@ -1,0 +1,55 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+from models.files import FileKind, VersionStatus
+
+
+class InternalFileSubmit(BaseModel):
+    """Bot `/internal/files` orqali fayl topshirilganda yuboradigan payload.
+    Binary hech qachon kelmaydi — faqat Telegram file_id + metadata."""
+
+    task_id: uuid.UUID
+    uploaded_by: uuid.UUID  # users.id (bot buni telegram_id orqali topib yuboradi)
+    telegram_file_id: str = Field(min_length=1, max_length=512)
+    telegram_message_id: int
+    file_name: str = Field(min_length=1, max_length=512)
+    mime_type: str | None = None
+    file_size: int | None = None
+
+
+class FileVersionOut(BaseModel):
+    id: uuid.UUID
+    file_id: uuid.UUID
+    version_number: int
+    telegram_file_id: str
+    file_name: str
+    uploaded_by: uuid.UUID
+    is_active: bool
+    status: VersionStatus
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FileOut(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID | None
+    episode_id: uuid.UUID | None
+    project_id: uuid.UUID | None
+    owner_id: uuid.UUID
+    file_kind: FileKind
+    current_name: str
+    mime_type: str | None
+    file_size: int | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FileSubmitResult(BaseModel):
+    file: FileOut
+    version: FileVersionOut
+    task_status: str
+    task_current_version: int

@@ -1,0 +1,28 @@
+import uuid
+
+from pydantic import BaseModel
+
+
+class TelegramAuthRequest(BaseModel):
+    init_data: str  # Mini App'dan kelgan xom Telegram.WebApp.initData satri
+
+
+class UserOut(BaseModel):
+    id: uuid.UUID
+    telegram_id: int
+    first_name: str
+    last_name: str | None
+    telegram_username: str | None
+    role: str
+    director_status: str
+    is_admin: bool
+    is_super_admin: bool
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    is_new_user: bool
+    user: UserOut

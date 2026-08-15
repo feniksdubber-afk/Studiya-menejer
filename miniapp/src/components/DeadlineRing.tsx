@@ -24,7 +24,9 @@ export function DeadlineRing({ deadline, size = 46 }: { deadline: string; size?:
 
   const trackClass = "stroke-tg-secondaryBg";
   const progressClass = isOverdue ? "stroke-role-voice-600" : "stroke-role-director-600";
-  const labelClass = isOverdue ? "text-role-voice-800" : "text-role-director-800";
+  const labelClass = isOverdue
+    ? "text-role-voice-800 dark:text-role-voice-400"
+    : "text-role-director-800 dark:text-role-director-400";
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>

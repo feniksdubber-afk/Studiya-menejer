@@ -1,4 +1,5 @@
-import { AlertTriangle, Bot } from "lucide-react";
+import { AlertTriangle, Bot, RefreshCw } from "lucide-react";
+import { useRouteError, useNavigate, isRouteErrorResponse } from "react-router-dom";
 
 export function LoadingScreen() {
   return (
@@ -23,6 +24,55 @@ export function ErrorScreen({ message, onRetry }: { message: string; onRetry: ()
         className="rounded-xl bg-tg-button px-5 py-2.5 text-sm font-medium text-tg-buttonText"
       >
         Qayta urinish
+      </button>
+    </div>
+  );
+}
+
+// So'rov (useQuery) xato bilan tugaganda sahifa ichida ko'rsatiladigan
+// kichik xatolik bloki — butun ekranni egallamaydi, "Yuklanmoqda..."da
+// abadiy qolib ketishning oldini oladi.
+export function QueryError({
+  message = "Ma'lumotlarni yuklab bo'lmadi.",
+  onRetry,
+}: {
+  message?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl bg-tg-secondaryBg p-6 text-center">
+      <AlertTriangle size={24} className="text-role-voice-600" aria-hidden="true" />
+      <p className="text-sm text-tg-hint">{message}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-1.5 rounded-xl bg-tg-button px-4 py-2 text-sm font-medium text-tg-buttonText"
+        >
+          <RefreshCw size={14} aria-hidden="true" /> Qayta urinish
+        </button>
+      )}
+    </div>
+  );
+}
+
+// react-router errorElement uchun — kutilmagan renderlash xatolarida butun
+// ilova oq ekranga aylanib qolmasligi uchun.
+export function RouteErrorBoundary() {
+  const error = useRouteError();
+  const navigate = useNavigate();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} — sahifa topilmadi`
+    : "Kutilmagan xatolik yuz berdi.";
+
+  return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-tg-bg p-6 text-center text-tg-text">
+      <AlertTriangle size={32} className="text-role-voice-600" aria-hidden="true" />
+      <p className="text-sm text-tg-hint">{message}</p>
+      <button
+        onClick={() => navigate("/")}
+        className="rounded-xl bg-tg-button px-5 py-2.5 text-sm font-medium text-tg-buttonText"
+      >
+        Bosh sahifaga qaytish
       </button>
     </div>
   );

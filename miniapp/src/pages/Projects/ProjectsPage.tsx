@@ -6,7 +6,8 @@ import { createProject, listProjects } from "@/api/projects";
 import { searchAniList, type AniListSearchResult } from "@/api/anilist";
 import { useAuth } from "@/auth/useAuth";
 import { useToast } from "@/components/Toast";
-import { QueryError } from "@/components/StatusScreens";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
 import { Sparkles, Tv, Clapperboard, Ghost, Film, Plus, X } from "lucide-react";
 import type { ProjectType } from "@/types";
 
@@ -131,7 +132,7 @@ export default function ProjectsPage() {
     submitProject();
   }
 
-  if (isLoading) return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+  if (isLoading) return <LoadingScreen />;
   if (isError) {
     return (
       <div className="p-5">
@@ -265,7 +266,7 @@ export default function ProjectsPage() {
             />
           </div>
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-role-voice-800 dark:text-role-voice-400">{error}</p>}
 
           <button
             type="submit"
@@ -278,7 +279,7 @@ export default function ProjectsPage() {
       )}
 
       {(!projects || projects.length === 0) && (
-        <p className="text-sm text-tg-hint">Hozircha loyihalar yo'q.</p>
+        <EmptyState icon={Clapperboard} message="Hozircha loyihalar yo'q." />
       )}
 
       <div className="grid grid-cols-2 gap-3">
@@ -288,7 +289,7 @@ export default function ProjectsPage() {
             <button
               key={project.id}
               onClick={() => navigate(`/projects/${project.id}`)}
-              className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3 text-left"
+              className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3 text-left active:opacity-70"
             >
               <div className="flex aspect-[2/3] items-center justify-center rounded-xl bg-black/5">
                 {project.poster_url ? (

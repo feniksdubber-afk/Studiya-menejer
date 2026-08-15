@@ -4,7 +4,8 @@ import WebApp from "@twa-dev/sdk";
 import { listMyTasks } from "@/api/tasks";
 import { TaskStatusBadge, isDeadlineSoon } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
-import { QueryError } from "@/components/StatusScreens";
+import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { EmptyState } from "@/components/EmptyState";
 import { RotateCcw, AlertCircle, Clock3, ClipboardList } from "lucide-react";
 import type { Task } from "@/types";
 
@@ -20,7 +21,9 @@ const GROUP_META: Record<Group, { title: string; icon: typeof RotateCcw }> = {
 function groupOf(task: Task): Group {
   if (task.status === "revision_requested") return "revision";
   if (task.status === "delayed") return "delayed";
-  if (isDeadlineSoon(task.deadline)) return "soon";
+  // "accepted" — vazifa allaqachon yakunlangan, shuning uchun deadline
+  // yaqinligidan qat'iy nazar "Deadline yaqin" guruhiga tushmasligi kerak.
+  if (task.status !== "accepted" && isDeadlineSoon(task.deadline)) return "soon";
   return "rest";
 }
 
@@ -39,7 +42,7 @@ export default function MyTasksPage() {
   });
 
   if (isLoading) {
-    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+    return <LoadingScreen />;
   }
   if (isError) {
     return (
@@ -49,7 +52,11 @@ export default function MyTasksPage() {
     );
   }
   if (!tasks || tasks.length === 0) {
-    return <p className="p-5 text-sm text-tg-hint">Sizga biriktirilgan vazifalar yo'q.</p>;
+    return (
+      <div className="p-5">
+        <EmptyState icon={ClipboardList} message="Sizga biriktirilgan vazifalar yo'q." />
+      </div>
+    );
   }
 
   const groups: Group[] = ["revision", "delayed", "soon", "rest"];
@@ -79,7 +86,7 @@ export default function MyTasksPage() {
                     WebApp.HapticFeedback.impactOccurred("light");
                     navigate(`/tasks/${task.id}`);
                   }}
-                  className="flex items-center gap-3 rounded-2xl bg-tg-secondaryBg p-4 text-left"
+                  className="flex items-center gap-3 rounded-2xl bg-tg-secondaryBg p-4 text-left active:opacity-70"
                 >
                   {task.deadline && (g === "soon" || g === "delayed") ? (
                     <DeadlineRing deadline={task.deadline} size={40} />

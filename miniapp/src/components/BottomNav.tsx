@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
+import { ClipboardList, Clapperboard, CircleUserRound } from "lucide-react";
 
 const items = [
-  { to: "/tasks", label: "Vazifalarim", icon: "📋" },
-  { to: "/projects", label: "Loyihalar", icon: "🎬" },
-  { to: "/profile", label: "Profil", icon: "👤" },
+  { to: "/tasks", label: "Vazifalarim", icon: ClipboardList },
+  { to: "/projects", label: "Loyihalar", icon: Clapperboard },
+  { to: "/profile", label: "Profil", icon: CircleUserRound },
 ];
 
 export function BottomNav() {
@@ -19,8 +20,12 @@ export function BottomNav() {
             }`
           }
         >
-          <span className="text-lg leading-none">{item.icon}</span>
-          <span>{item.label}</span>
+          {({ isActive }) => (
+            <>
+              <item.icon size={20} strokeWidth={isActive ? 2.3 : 1.8} aria-hidden="true" />
+              <span>{item.label}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>

@@ -56,3 +56,8 @@ export async function uploadCharacterImage(characterId: string, file: File): Pro
   );
   return data;
 }
+
+export async function deleteCharacterImage(characterId: string): Promise<Character> {
+  const { data } = await apiClient.delete<Character>(`/characters/${characterId}/image`);
+  return data;
+}

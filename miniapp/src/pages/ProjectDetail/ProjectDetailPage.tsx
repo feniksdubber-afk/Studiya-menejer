@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import WebApp from "@twa-dev/sdk";
 import {
   getProject,
   listProjectMembers,
@@ -13,8 +14,11 @@ import {
 } from "@/api/projects";
 import { listCharacters, createCharacter } from "@/api/characters";
 import { getAniListCharacters, type AniListCharacter } from "@/api/anilist";
-import { searchUsers } from "@/api/users";
 import { Avatar } from "@/components/Avatar";
+import { QueryError } from "@/components/StatusScreens";
+import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
+import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
+import { useToast } from "@/components/Toast";
 import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film } from "lucide-react";
 import type { ProjectMember, ProjectRole, Season, User } from "@/types";
 
@@ -38,10 +42,10 @@ const CATEGORY_META: Record<
   RoleCategory,
   { title: string; icon: typeof Clapperboard; badgeClass: string }
 > = {
-  director: { title: "Rejissyorlar", icon: Clapperboard, badgeClass: "bg-role-director-50 text-role-director-800" },
-  translator: { title: "Tarjimonlar", icon: Languages, badgeClass: "bg-role-translator-50 text-role-translator-800" },
-  voice_actor: { title: "Ovoz aktyorlari", icon: Mic2, badgeClass: "bg-role-voice-50 text-role-voice-800" },
-  sound: { title: "Svedeniyachilar", icon: AudioWaveform, badgeClass: "bg-role-sound-50 text-role-sound-800" },
+  director: { title: "Rejissyorlar", icon: Clapperboard, badgeClass: "bg-role-director-50 text-role-director-800 dark:bg-role-director-900/50 dark:text-role-director-400" },
+  translator: { title: "Tarjimonlar", icon: Languages, badgeClass: "bg-role-translator-50 text-role-translator-800 dark:bg-role-translator-900/50 dark:text-role-translator-400" },
+  voice_actor: { title: "Ovoz aktyorlari", icon: Mic2, badgeClass: "bg-role-voice-50 text-role-voice-800 dark:bg-role-voice-900/50 dark:text-role-voice-400" },
+  sound: { title: "Svedeniyachilar", icon: AudioWaveform, badgeClass: "bg-role-sound-50 text-role-sound-800 dark:bg-role-sound-900/50 dark:text-role-sound-400" },
 };
 
 const CATEGORY_ORDER: RoleCategory[] = ["director", "translator", "voice_actor", "sound"];
@@ -188,45 +192,45 @@ function AddSeasonForm({ projectId }: { projectId: string }) {
 
 function AddMemberForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [role, setRole] = useState<ProjectRole>("translator_main");
+  const {
+    query,
+    setQuery,
+    results,
+    setResults,
+    isSearching,
+    handleQueryChange: rawHandleQueryChange,
+    reset: resetSearch,
+  } = useDebouncedUserSearch();
 
-  const { mutate: submit, isPending, error, reset } = useMutation({
+  const { mutate: submit, isPending, error, reset: resetMutation } = useMutation({
     mutationFn: () => addProjectMember(projectId, selectedUser!.id, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members", projectId] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Jamoaga qo'shildi.");
       resetForm();
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("A'zoni qo'shib bo'lmadi.");
     },
   });
 
   function resetForm() {
     setIsOpen(false);
     setSelectedUser(null);
-    setQuery("");
-    setResults([]);
     setRole("translator_main");
-    reset();
+    resetSearch();
+    resetMutation();
   }
 
-  async function handleQueryChange(value: string) {
-    setQuery(value);
+  function handleQueryChange(value: string) {
     setSelectedUser(null);
-    if (value.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      setResults(await searchUsers(value.trim()));
-    } catch {
-      setResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+    rawHandleQueryChange(value);
   }
 
   if (!isOpen) {
@@ -243,8 +247,9 @@ function AddMemberForm({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4">
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-tg-hint">Foydalanuvchini qidirish</label>
+        <label htmlFor="project-member-search" className="text-xs font-medium text-tg-hint">Foydalanuvchini qidirish</label>
         <input
+          id="project-member-search"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder="Ism yoki @username"
@@ -395,11 +400,18 @@ export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [tab, setTab] = useState<Tab>("seasons");
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  useTelegramBackButton("/projects");
 
-  const { data: project } = useQuery({
+  const {
+    data: project,
+    isLoading: isProjectLoading,
+    isError: isProjectError,
+    refetch: refetchProject,
+  } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId!),
     enabled: !!projectId,
@@ -433,7 +445,26 @@ export default function ProjectDetailPage() {
   const { mutate: removeMember, variables: removingMemberVars } = useMutation({
     mutationFn: ({ projectId: pid, memberId }: { projectId: string; memberId: string }) =>
       removeProjectMember(pid, memberId),
+    // Optimistik yangilanish: a'zoni ro'yxatdan darhol olib tashlaymiz,
+    // server javobini kutib turmasdan — xato bo'lsa oldingi holatga qaytaramiz.
+    onMutate: async ({ memberId }) => {
+      await queryClient.cancelQueries({ queryKey: ["members", projectId] });
+      const previous = queryClient.getQueryData<ProjectMember[]>(["members", projectId]);
+      queryClient.setQueryData<ProjectMember[]>(["members", projectId], (old) =>
+        old?.filter((m) => m.id !== memberId)
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["members", projectId], context.previous);
+      }
+      showError("A'zoni olib tashlab bo'lmadi.");
+    },
     onSuccess: () => {
+      showSuccess("A'zo jamoadan olib tashlandi.");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["members", projectId] });
     },
   });
@@ -479,9 +510,21 @@ export default function ProjectDetailPage() {
 
   const existingNames = new Set((characters ?? []).map((c) => c.anilist_original_name ?? c.name));
 
+  if (isProjectLoading) {
+    return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+  }
+
+  if (isProjectError || !project) {
+    return (
+      <div className="p-5">
+        <QueryError message="Loyihani yuklab bo'lmadi." onRetry={() => refetchProject()} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-5 pt-6 pb-20">
-      <h1 className="text-lg font-semibold text-tg-text">{project?.title ?? "..."}</h1>
+      <h1 className="text-lg font-semibold text-tg-text">{project.title}</h1>
 
       <div className="flex gap-2 rounded-xl bg-tg-secondaryBg p-1">
         {(

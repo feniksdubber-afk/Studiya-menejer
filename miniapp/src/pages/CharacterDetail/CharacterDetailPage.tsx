@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import {
   addCharacterCast,
+  deleteCharacterImage,
   getCharacter,
   listCharacterCast,
   removeCharacterCast,
+  uploadCharacterImage,
 } from "@/api/characters";
 import { searchUsers } from "@/api/users";
-import { useAuth } from "@/auth/useAuth";
 import { Avatar } from "@/components/Avatar";
 import type { CastType, User } from "@/types";
 
@@ -170,15 +171,38 @@ function AddActorForm({ characterId }: { characterId: string }) {
 
 export default function CharacterDetailPage() {
   const { characterId } = useParams<{ characterId: string }>();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canManage = user?.role === "director" || user?.is_admin || user?.is_super_admin;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: character, isLoading } = useQuery({
     queryKey: ["character", characterId],
     queryFn: () => getCharacter(characterId!),
     enabled: !!characterId,
   });
+
+  // Backend loyihaga xos ruxsatni hisoblab shu maydonda qaytaradi —
+  // global user.role emas (qarang: ProjectDetailPage.tsx).
+  const canManage = character?.can_manage ?? false;
+
+  const { mutate: uploadImage, isPending: isUploadingImage } = useMutation({
+    mutationFn: (file: File) => uploadCharacterImage(characterId!, file),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["character", characterId], updated);
+    },
+  });
+
+  const { mutate: removeImage, isPending: isRemovingImage } = useMutation({
+    mutationFn: () => deleteCharacterImage(characterId!),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["character", characterId], updated);
+    },
+  });
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) uploadImage(file);
+  }
 
   const { data: cast } = useQuery({
     queryKey: ["character-cast", characterId],
@@ -223,6 +247,35 @@ export default function CharacterDetailPage() {
             <p className="text-sm text-white/80 drop-shadow">{character.anilist_original_name}</p>
           )}
         </div>
+        {canManage && (
+          <div className="absolute right-3 top-3 flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur disabled:opacity-50"
+            >
+              {isUploadingImage ? "Yuklanmoqda..." : "🖼 Rasm o'zgartirish"}
+            </button>
+            {character.image_source === "custom" && (
+              <button
+                type="button"
+                onClick={() => removeImage()}
+                disabled={isRemovingImage}
+                className="rounded-full bg-black/50 px-3 py-1.5 text-xs font-medium text-white backdrop-blur disabled:opacity-50"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-5 px-5">

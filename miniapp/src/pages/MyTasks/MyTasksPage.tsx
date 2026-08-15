@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import WebApp from "@twa-dev/sdk";
 import { listMyTasks } from "@/api/tasks";
 import { TaskStatusBadge, isDeadlineSoon } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
+import { QueryError } from "@/components/StatusScreens";
 import { RotateCcw, AlertCircle, Clock3, ClipboardList } from "lucide-react";
 import type { Task } from "@/types";
 
@@ -31,7 +33,7 @@ const TASK_TYPE_LABEL: Record<Task["task_type"], string> = {
 
 export default function MyTasksPage() {
   const navigate = useNavigate();
-  const { data: tasks, isLoading, isError } = useQuery({
+  const { data: tasks, isLoading, isError, refetch } = useQuery({
     queryKey: ["tasks", "mine"],
     queryFn: listMyTasks,
   });
@@ -40,7 +42,11 @@ export default function MyTasksPage() {
     return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
   }
   if (isError) {
-    return <p className="p-5 text-sm text-red-600">Vazifalarni yuklab bo'lmadi.</p>;
+    return (
+      <div className="p-5">
+        <QueryError message="Vazifalarni yuklab bo'lmadi." onRetry={() => refetch()} />
+      </div>
+    );
   }
   if (!tasks || tasks.length === 0) {
     return <p className="p-5 text-sm text-tg-hint">Sizga biriktirilgan vazifalar yo'q.</p>;
@@ -69,7 +75,10 @@ export default function MyTasksPage() {
               {groupTasks.map((task) => (
                 <button
                   key={task.id}
-                  onClick={() => navigate(`/tasks/${task.id}`)}
+                  onClick={() => {
+                    WebApp.HapticFeedback.impactOccurred("light");
+                    navigate(`/tasks/${task.id}`);
+                  }}
                   className="flex items-center gap-3 rounded-2xl bg-tg-secondaryBg p-4 text-left"
                 >
                   {task.deadline && (g === "soon" || g === "delayed") ? (

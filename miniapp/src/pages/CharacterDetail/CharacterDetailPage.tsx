@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import WebApp from "@twa-dev/sdk";
 import {
   addCharacterCast,
   deleteCharacterImage,
@@ -10,57 +11,62 @@ import {
   removeCharacterCast,
   uploadCharacterImage,
 } from "@/api/characters";
-import { searchUsers } from "@/api/users";
 import { Avatar } from "@/components/Avatar";
+import { QueryError } from "@/components/StatusScreens";
+import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
+import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
+import { useToast } from "@/components/Toast";
 import { Drama, Image, X, Mic2, Star } from "lucide-react";
-import type { CastType, User } from "@/types";
+import type { CastType, CharacterCast, User } from "@/types";
+
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const CAST_TYPE_META: Record<CastType, { label: string; badgeClass: string; icon: typeof Star | null }> = {
-  main: { label: "Asosiy", badgeClass: "bg-role-sound-50 text-role-sound-800", icon: Star },
+  main: { label: "Asosiy", badgeClass: "bg-role-sound-50 text-role-sound-800 dark:bg-role-sound-900/50 dark:text-role-sound-400", icon: Star },
   alternate: { label: "Muqobil", badgeClass: "bg-tg-bg text-tg-hint", icon: null },
 };
 
 function AddActorForm({ characterId }: { characterId: string }) {
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [castType, setCastType] = useState<CastType>("main");
+  const {
+    query,
+    setQuery,
+    results,
+    setResults,
+    isSearching,
+    handleQueryChange: rawHandleQueryChange,
+    reset: resetSearch,
+  } = useDebouncedUserSearch();
 
-  const { mutate: submit, isPending, error, reset } = useMutation({
+  const { mutate: submit, isPending, error, reset: resetMutation } = useMutation({
     mutationFn: () => addCharacterCast(characterId, selectedUser!.id, castType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["character-cast", characterId] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Aktyor biriktirildi.");
       resetForm();
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Aktyorni biriktirib bo'lmadi.");
     },
   });
 
   function resetForm() {
     setIsOpen(false);
     setSelectedUser(null);
-    setQuery("");
-    setResults([]);
     setCastType("main");
-    reset();
+    resetSearch();
+    resetMutation();
   }
 
-  async function handleQueryChange(value: string) {
-    setQuery(value);
+  function handleQueryChange(value: string) {
     setSelectedUser(null);
-    if (value.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      setResults(await searchUsers(value.trim()));
-    } catch {
-      setResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+    rawHandleQueryChange(value);
   }
 
   if (!isOpen) {
@@ -77,8 +83,9 @@ function AddActorForm({ characterId }: { characterId: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4">
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-tg-hint">Aktyorni qidirish</label>
+        <label htmlFor="character-actor-search" className="text-xs font-medium text-tg-hint">Aktyorni qidirish</label>
         <input
+          id="character-actor-search"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder="Ism yoki @username"
@@ -174,9 +181,17 @@ function AddActorForm({ characterId }: { characterId: string }) {
 export default function CharacterDetailPage() {
   const { characterId } = useParams<{ characterId: string }>();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [localFileError, setLocalFileError] = useState<string | null>(null);
+  useTelegramBackButton("/projects");
 
-  const { data: character, isLoading } = useQuery({
+  const {
+    data: character,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["character", characterId],
     queryFn: () => getCharacter(characterId!),
     enabled: !!characterId,
@@ -194,6 +209,10 @@ export default function CharacterDetailPage() {
     mutationFn: (file: File) => uploadCharacterImage(characterId!, file),
     onSuccess: (updated) => {
       queryClient.setQueryData(["character", characterId], updated);
+      WebApp.HapticFeedback.notificationOccurred("success");
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
     },
   });
 
@@ -207,10 +226,28 @@ export default function CharacterDetailPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) uploadImage(file);
+    if (!file) return;
+
+    // Katta/noto'g'ri turdagi fayllarni serverga yubormasdan oldin
+    // tekshiramiz — foydalanuvchi tezroq xabar oladi va bekorga trafik
+    // sarflanmaydi.
+    if (!file.type.startsWith("image/")) {
+      setLocalFileError("Faqat rasm fayllarini yuklash mumkin.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setLocalFileError("Rasm hajmi 8 MB dan oshmasligi kerak.");
+      return;
+    }
+    setLocalFileError(null);
+    uploadImage(file);
   }
 
-  const { data: cast } = useQuery({
+  const {
+    data: cast,
+    isError: isCastError,
+    refetch: refetchCast,
+  } = useQuery({
     queryKey: ["character-cast", characterId],
     queryFn: () => listCharacterCast(characterId!),
     enabled: !!characterId,
@@ -218,14 +255,39 @@ export default function CharacterDetailPage() {
 
   const { mutate: removeCast, variables: removingVars } = useMutation({
     mutationFn: ({ castId }: { castId: string }) => removeCharacterCast(characterId!, castId),
+    onMutate: async ({ castId }) => {
+      await queryClient.cancelQueries({ queryKey: ["character-cast", characterId] });
+      const previous = queryClient.getQueryData<CharacterCast[]>(["character-cast", characterId]);
+      queryClient.setQueryData<CharacterCast[]>(["character-cast", characterId], (old) =>
+        old?.filter((c) => c.id !== castId)
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["character-cast", characterId], context.previous);
+      }
+      showError("Aktyorni olib tashlab bo'lmadi.");
+    },
     onSuccess: () => {
+      showSuccess("Aktyor olib tashlandi.");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["character-cast", characterId] });
     },
   });
   const removingCastId = removingVars?.castId ?? null;
 
-  if (isLoading || !character) {
+  if (isLoading) {
     return <p className="p-5 text-sm text-tg-hint">Yuklanmoqda...</p>;
+  }
+
+  if (isError || !character) {
+    return (
+      <div className="p-5">
+        <QueryError message="Personajni yuklab bo'lmadi." onRetry={() => refetch()} />
+      </div>
+    );
   }
 
   const mainCast = (cast ?? []).filter((c) => c.cast_type === "main");
@@ -288,11 +350,13 @@ export default function CharacterDetailPage() {
         )}
       </div>
 
-      {uploadError && (
+      {(uploadError || localFileError) && (
         <div className="mx-5 -mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-400">
-          {axios.isAxiosError(uploadError) && uploadError.response?.data?.detail
-            ? String(uploadError.response.data.detail)
-            : "Rasmni yuklab bo'lmadi. Qaytadan urinib ko'ring."}
+          {localFileError
+            ? localFileError
+            : axios.isAxiosError(uploadError) && uploadError?.response?.data?.detail
+              ? String(uploadError.response.data.detail)
+              : "Rasmni yuklab bo'lmadi. Qaytadan urinib ko'ring."}
         </div>
       )}
 
@@ -311,7 +375,9 @@ export default function CharacterDetailPage() {
             {canManage && characterId && <AddActorForm characterId={characterId} />}
           </div>
 
-          {mainCast.length === 0 && altCast.length === 0 ? (
+          {isCastError ? (
+            <QueryError message="Aktyorlar ro'yxatini yuklab bo'lmadi." onRetry={() => refetchCast()} />
+          ) : mainCast.length === 0 && altCast.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-2xl bg-tg-secondaryBg px-4 py-8 text-center">
               <Mic2 size={22} className="text-tg-hint" aria-hidden="true" />
               <p className="text-sm text-tg-hint">

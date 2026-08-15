@@ -266,6 +266,7 @@ async def request_revision(
             )
         )
         task.deadline = payload.new_deadline
+        task.notified_3h = False  # yangi deadline uchun 3-soatlik eslatma qayta faollashadi
 
     task.status = TaskStatus.revision_requested
     task.revision_reason = payload.reason

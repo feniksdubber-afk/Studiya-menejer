@@ -442,7 +442,11 @@ export default function ProjectDetailPage() {
     enabled: !!projectId && tab === "team",
   });
 
-  const { mutate: removeMember, variables: removingMemberVars } = useMutation({
+  const {
+    mutate: removeMember,
+    variables: removingMemberVars,
+    isPending: isRemovingMember,
+  } = useMutation({
     mutationFn: ({ projectId: pid, memberId }: { projectId: string; memberId: string }) =>
       removeProjectMember(pid, memberId),
     // Optimistik yangilanish: a'zoni ro'yxatdan darhol olib tashlaymiz,
@@ -468,7 +472,10 @@ export default function ProjectDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["members", projectId] });
     },
   });
-  const removingMemberId = removingMemberVars?.memberId ?? null;
+  // MUHIM: `isPending` bilan birga tekshirilmasa, mutatsiya xato bilan
+  // tugaganda (masalan tarmoq uzilishi) tugma abadiy disabled bo'lib qoladi —
+  // qarang: CharacterDetailPage.tsx'dagi xuddi shu naqsh.
+  const removingMemberId = isRemovingMember ? removingMemberVars?.memberId ?? null : null;
 
   const { data: aniListCharacters, isLoading: isLoadingAniList } = useQuery({
     queryKey: ["anilist-characters", project?.anilist_id],

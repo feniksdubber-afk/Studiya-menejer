@@ -41,6 +41,8 @@ export type ProjectRole =
   | "director_extra"
   | "translator_main"
   | "translator_extra"
+  | "voice_actor_main"
+  | "voice_actor_extra"
   | "sound_main"
   | "sound_extra";
 
@@ -50,6 +52,7 @@ export interface ProjectMember {
   user_id: string;
   role_in_project: ProjectRole;
   added_at: string;
+  user: CastMemberUser;
 }
 
 export interface Season {
@@ -88,11 +91,19 @@ export interface Character {
   display_image_url: string | null;
 }
 
+export interface CastMemberUser {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  telegram_username: string | null;
+}
+
 export interface CharacterCast {
   id: string;
   character_id: string;
   user_id: string;
   cast_type: CastType;
+  user: CastMemberUser;
 }
 
 export type TaskType = "translation" | "voice" | "sound_video" | "sound_audio";

@@ -241,9 +241,10 @@ export default function TaskDetailPage() {
       </div>
 
       <div className="flex items-center gap-4 rounded-2xl bg-tg-secondaryBg p-4">
-        {task.deadline && (task.status === "pending" || task.status === "revision_requested") && (
-          <DeadlineRing deadline={task.deadline} />
-        )}
+        {task.deadline &&
+          (task.status === "pending" ||
+            task.status === "revision_requested" ||
+            task.status === "delayed") && <DeadlineRing deadline={task.deadline} />}
         <dl className="flex flex-1 flex-col gap-2 text-sm">
           {task.deadline && (
             <div className="flex justify-between">
@@ -267,7 +268,17 @@ export default function TaskDetailPage() {
         </div>
       )}
 
-      {isAssignee && (task.status === "pending" || task.status === "revision_requested") && (
+      {isAssignee &&
+        // MUHIM: bu ro'yxat backend'dagi api/services/file_service.py va
+        // bot/handlers/file_submit.py'dagi _SUBMITTABLE_STATUSES bilan bir
+        // xil bo'lishi shart — aks holda foydalanuvchi backend ruxsat
+        // bergan holatda ham Mini App'da "Fayl topshirish" tugmasini
+        // ko'rmay qoladi (masalan 'delayed' — deadline o'tib ketgan, lekin
+        // hali topshirish mumkin bo'lgan tasklar uchun).
+        (task.status === "pending" ||
+          task.status === "revision_requested" ||
+          task.status === "delayed" ||
+          task.status === "submitted") && (
         <button
           onClick={openSubmissionInBot}
           disabled={!config?.bot_username}

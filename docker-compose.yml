@@ -15,10 +15,14 @@ services:
       retries: 10
     networks: [internal]
 
+  # Bu servis Hetzner'da mavjud afsona-caddy (afsona_default tarmog'i) orqali
+  # tashqariga chiqariladi — o'z Caddy'si yo'q, port map ham qilinmaydi.
+  # container_name Caddyfile'dagi reverse_proxy manzili bilan mos bo'lishi shart.
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
+    container_name: afsona-dub-api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -39,7 +43,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: [internal]
+    networks: [internal, afsona_shared]
 
   bot:
     build:
@@ -55,31 +59,17 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       BOT_TOKEN: ${BOT_TOKEN}
       BOT_USERNAME: ${BOT_USERNAME}
-      API_BASE_URL: http://api:8000
+      API_BASE_URL: http://afsona-dub-api:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-    networks: [internal]
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on: [api]
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./miniapp/dist:/srv/miniapp:ro
-      - caddy_data:/data
-      - caddy_config:/config
     networks: [internal]
 
 networks:
   internal:
+  # Mavjud Hetzner serveridagi AfsonaMovieBot stack'i ishlatadigan tarmoq.
+  # afsona-caddy shu tarmoqda turadi va shu orqali afsona-dub-api'ga yetadi.
+  afsona_shared:
+    external: true
+    name: afsona_default
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:

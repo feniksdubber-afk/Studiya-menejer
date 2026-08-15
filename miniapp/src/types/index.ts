@@ -142,3 +142,19 @@ export interface DeadlineHistory {
   reason: string | null;
   changed_at: string;
 }
+
+export type NotificationType =
+  | "task_assigned"
+  | "task_submitted"
+  | "task_revision_requested"
+  | "task_delayed"
+  | "deadline_soon"
+  | string;
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  payload: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}

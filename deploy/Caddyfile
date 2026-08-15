@@ -1,0 +1,26 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# FastAPI backend
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:8000
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	# Telegram Mini App static build (miniapp/dist).
+	# Bo'sh bo'lsa 404 qaytadi — bu bosqichda kutilgan holat,
+	# frontend hali qurilmagan.
+	handle {
+		root * /srv/miniapp
+		try_files {path} /index.html
+		file_server
+	}
+}

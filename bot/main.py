@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import BOT_TOKEN
 from handlers import admin_approval, admin_management, file_submit, registration
-from services.deadline_notifier import check_deadlines
+from services.deadline_notifier import check_deadlines, check_overdue_tasks
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,6 +17,11 @@ logging.basicConfig(level=logging.INFO)
 # yaqin (foydalanuvchi eng ko'pi bilan ~15 daqiqa kechikib xabar oladi),
 # lekin bazaga ortiqcha yuklama solmaydi.
 DEADLINE_CHECK_INTERVAL_MINUTES = 15
+
+# Deadline'i o'tib ketgan tasklarni 'delayed'ga o'tkazish uchun tekshiruv —
+# eslatma jobi bilan bir xil chastota yetarli (task allaqachon "3 soat
+# qoldi" eslatmasini olgan bo'ladi, bu esa uni "kechikkan" deb belgilaydi).
+OVERDUE_CHECK_INTERVAL_MINUTES = 15
 
 
 async def main():
@@ -39,10 +44,19 @@ async def main():
         args=[bot],
         id="deadline_check",
     )
+    scheduler.add_job(
+        check_overdue_tasks,
+        "interval",
+        minutes=OVERDUE_CHECK_INTERVAL_MINUTES,
+        args=[bot],
+        id="overdue_check",
+    )
     scheduler.start()
     logging.info(
-        "Deadline scheduler ishga tushdi (har %d daqiqada tekshiradi)",
+        "Deadline scheduler ishga tushdi (har %d daqiqada tekshiradi, "
+        "kechikkan tasklar har %d daqiqada belgilanadi)",
         DEADLINE_CHECK_INTERVAL_MINUTES,
+        OVERDUE_CHECK_INTERVAL_MINUTES,
     )
 
     await bot.delete_webhook(drop_pending_updates=True)

@@ -1,0 +1,35 @@
+# === Quyidagini /opt/afsona/caddy/Caddyfile FAYLI OXIRIGA qo'shing ===
+# (mavjud app.afsonatv.uz va voice.afsonatv.uz blocklaridan keyin)
+#
+# Eslatma: bu block "tls" direktivasini ko'rsatmaydi — Caddy shu domen uchun
+# Let's Encrypt orqali avtomatik sertifikat oladi (mavjud ikkita domen qo'lda
+# cert.pem/key.pem ishlatgan, lekin bu — faqat o'sha domenlarga tegishli;
+# yangi domen uchun avtomatik ACME oddiy va tavsiya etiladi).
+#
+# DOMENNI o'zingizniki bilan almashtiring (masalan dub.afsonatv.uz).
+
+dub.afsonatv.uz {
+    encode gzip
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+    }
+
+    # FastAPI backend (afsona-dub-api konteyneri, afsona_default tarmog'ida)
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy afsona-dub-api:8000
+    }
+
+    handle /health {
+        reverse_proxy afsona-dub-api:8000
+    }
+
+    # Mini App static build. /opt/afsona-dub/miniapp/dist shu yerga
+    # volume sifatida ulanadi (pastdagi docker-compose.yml o'zgarishiga qarang).
+    handle {
+        root * /srv/dub-miniapp
+        try_files {path} /index.html
+        file_server
+    }
+}

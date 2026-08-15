@@ -1,11 +1,28 @@
-# AFSONA DUB — Deploy runbook (Hetzner)
+# AFSONA DUB — Deploy runbook (Hetzner, mavjud afsona_default tarmog'i bilan)
+
+> **Muhim:** bu serverda AfsonaMovieBot allaqachon ishlab turibdi va 80/443
+> portlarni `afsona-caddy` egallagan. Shu sababli AFSONA DUB o'z Caddy'sini
+> ishga TUSHIRMAYDI — `docker-compose.yml`da caddy xizmati yo'q. Uning o'rniga
+> `api` konteyneri mavjud `afsona_default` tarmog'iga qo'shiladi va
+> `afsona-caddy` unga proxy qiladi (§0.3 va §8 ga qarang).
 
 ## 0. Server tayyorlash
 ```bash
-apt update && apt install -y docker.io docker-compose-plugin git
 mkdir -p /opt/afsona-dub && cd /opt/afsona-dub
 git clone <repo> .
 ```
+
+## 0.1 .gitignore tekshirish
+Repo ichida fayl nomi ba'zan `gitignore` (nuqtasiz) bo'lib qolgan bo'lishi mumkin
+(GitHub zip export xatosi). Kerak bo'lsa:
+```bash
+[ -f gitignore ] && mv gitignore .gitignore
+[ -f miniapp/gitignore ] && mv miniapp/gitignore miniapp/.gitignore
+```
+
+## 0.2 Docker tekshirish
+Docker/compose plugin serverda allaqachon o'rnatilgan (AfsonaMovieBot ishlab
+turibdi). Tekshirish uchun: `docker compose version`.
 
 ## 1. .env yaratish
 ```bash
@@ -50,13 +67,29 @@ docker compose up -d bot
 docker compose logs -f bot   # polling boshlanganini tasdiqlang, xatolik yo'qligini tekshiring
 ```
 
-## 8. Caddy + HTTPS
+## 8. Mavjud afsona-caddy'ga ulash (o'z Caddy'si yo'q!)
+
+**8.1 DNS** — `dub.afsonatv.uz` (yoki tanlangan subdomen) A-record'ini
+`138.199.169.92`ga yo'naltiring, tarqalishini kuting (`dig dub.afsonatv.uz`).
+
+**8.2 Caddyfile'ga yangi block qo'shish** — tayyor matn
+`deploy/dub-caddy-block.txt` faylida. Uni `/opt/afsona/caddy/Caddyfile`
+oxiriga qo'shing:
 ```bash
-docker compose up -d caddy
-docker compose logs -f caddy   # ACME sertifikat muvaffaqiyatli olinganini tekshiring
-curl -I https://$DOMAIN/health
+cat /opt/afsona-dub/deploy/dub-caddy-block.txt >> /opt/afsona/caddy/Caddyfile
+nano /opt/afsona/caddy/Caddyfile   # domen nomini tekshirib/almashtirib qo'ying
 ```
-> DNS: `$DOMAIN` A-record Hetzner server IP'siga ishora qilishi shart, aks holda Let's Encrypt muvaffaqiyatsiz bo'ladi.
+
+**8.3 Mini App static uchun volume qo'shish** — ko'rsatma:
+`deploy/existing-caddy-compose-patch.md` (bitta qator, `/opt/afsona/docker-compose.yml`
+ga qo'shiladi).
+
+**8.4 Caddy'ni qayta ishga tushirish:**
+```bash
+cd /opt/afsona && docker compose up -d caddy
+docker compose logs -f caddy   # ACME sertifikat muvaffaqiyatli olinganini tekshiring
+curl -I https://dub.afsonatv.uz/health
+```
 
 ## 9. Health check (hammasi birga)
 ```bash

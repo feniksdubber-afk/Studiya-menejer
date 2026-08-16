@@ -14,7 +14,7 @@
 
 | # | Bosqich | Holat |
 |---|---|---|
-| V1 | Video uchun R2 storage qatlami (model+presigned upload) | ❌ boshlanmagan |
+| V1 | Video uchun R2 storage qatlami (model+presigned upload) | ✅ bajarildi |
 | VF1 | Video Studio — video player + timeline (asosiy ekran) | ❌ boshlanmagan |
 | VF2 | Cue Capture — 📸 kadr olish, tezkor/batafsil rejim | ❌ boshlanmagan |
 | VF3 | Cue Editor — forma (yaratish/tahrirlash/duplicate) | ❌ boshlanmagan |

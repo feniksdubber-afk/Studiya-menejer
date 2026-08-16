@@ -34,5 +34,10 @@ class Settings(BaseSettings):
     character_image_max_bytes: int = 5 * 1024 * 1024  # 5 MB
     voice_cue_screenshot_max_bytes: int = 5 * 1024 * 1024  # 5 MB — video kadr skrinshoti
 
+    # --- V1: original video R2 storage (VOICE-CUES-PLAN.md) ---
+    video_max_bytes: int = 500 * 1024 * 1024  # 500 MB — presigned upload-url va confirm ikkalasida ham tekshiriladi
+    video_upload_url_expires_seconds: int = 60 * 15  # 15 daqiqa — brauzer shu vaqt ichida R2'ga yuklashi kerak
+    video_playback_url_expires_seconds: int = 60 * 60  # 1 soat — <video src> uchun vaqtinchalik o'qish havolasi
+
 
 settings = Settings()

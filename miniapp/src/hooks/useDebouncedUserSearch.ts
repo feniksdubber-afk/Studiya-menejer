@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { searchUsers } from "@/api/users";
-import type { User } from "@/types";
+import type { UserSearchResult } from "@/types";
 
 // Foydalanuvchi qidiruvini debounce qiladigan umumiy hook — a'zo qo'shish
 // (ProjectDetailPage) va aktyor biriktirish (CharacterDetailPage)
@@ -8,7 +8,7 @@ import type { User } from "@/types";
 // terilganda API'ga so'rov ketishining oldini oladi.
 export function useDebouncedUserSearch() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<User[]>([]);
+  const [results, setResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 

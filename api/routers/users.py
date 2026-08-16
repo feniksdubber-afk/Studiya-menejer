@@ -5,13 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
 from models.users import DirectorStatus, User, UserRole
 from routers.auth import require_registered_user
-from schemas.auth import RoleUpdateRequest, UserOut
+from schemas.auth import RoleUpdateRequest, UserOut, UserSearchResult
 from services.notification_dispatcher import notify
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/search", response_model=list[UserOut])
+@router.get("/search", response_model=list[UserSearchResult])
 async def search_users(
     q: str,
     db: AsyncSession = Depends(get_db),

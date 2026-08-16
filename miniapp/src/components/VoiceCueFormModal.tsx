@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X, Trash2 } from "lucide-react";
+import { listCharacterCast } from "@/api/characters";
 import type { Character, ProjectMember, VoiceCue } from "@/types";
 import { formatCueTime } from "./VoiceCueCard";
 
@@ -16,7 +18,6 @@ export function VoiceCueFormModal({
   timestampSeconds,
   characters,
   members,
-  castActorIdsForCharacter,
   defaultCharacterId,
   defaultActorId,
   existingCue,
@@ -32,8 +33,6 @@ export function VoiceCueFormModal({
   timestampSeconds: number;
   characters: Character[];
   members: ProjectMember[];
-  /** Tanlangan personajga character_cast orqali biriktirilgan aktyorlar id'lari. */
-  castActorIdsForCharacter: (characterId: string) => Set<string>;
   defaultCharacterId?: string | null;
   defaultActorId?: string | null;
   existingCue?: VoiceCue | null;
@@ -61,7 +60,15 @@ export function VoiceCueFormModal({
     setTs(timestampSeconds);
   }, [timestampSeconds]);
 
-  const castIds = characterId ? castActorIdsForCharacter(characterId) : new Set<string>();
+  // Tanlangan personajga biriktirilgan aktyorlar — dropdown'da yulduzcha bilan
+  // tepaga chiqarish uchun (VF3). useQuery orqali to'g'ri lifecycle'da: faqat
+  // characterId o'zgarganda so'raladi va React Query o'zi keshlaydi/dedupe qiladi.
+  const castQuery = useQuery({
+    queryKey: ["character-cast", characterId],
+    queryFn: () => listCharacterCast(characterId!),
+    enabled: !!characterId,
+  });
+  const castIds = new Set((castQuery.data ?? []).map((c) => c.user_id));
   const castMembers = members.filter((m) => castIds.has(m.user_id));
   const otherMembers = members.filter((m) => !castIds.has(m.user_id));
 

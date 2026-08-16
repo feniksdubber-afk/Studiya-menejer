@@ -83,6 +83,27 @@ async def is_project_director(db: AsyncSession, project_id: uuid.UUID, user: Use
     return membership is not None and membership.role_in_project in DIRECTOR_ROLES
 
 
+async def require_project_member(
+    project: Project,
+    user: User,
+    db: AsyncSession,
+) -> None:
+    """Allaqachon topilgan `project`/`user` obyektlari bilan "shu loyihaning
+    istalgan a'zosimi" tekshiruvi (director bo'lishi shart emas). VoiceCue
+    ("Rollar") kabi barcha faol a'zolarga (director/translator/voice
+    actor/sound) ochiq bo'lgan resurslar uchun ishlatiladi — require_project_director
+    bilan bir xil naqsh, faqat rol cheklovisiz.
+    """
+    if user.is_admin or user.is_super_admin:
+        return
+    membership = await get_membership(db, project.id, user.id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Siz bu loyiha a'zosi emassiz",
+        )
+
+
 async def require_project_director(
     project: Project,
     user: User,

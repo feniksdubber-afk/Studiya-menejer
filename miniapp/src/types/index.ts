@@ -136,6 +136,7 @@ export interface Task {
   episode_id: string;
   task_type: TaskType;
   character_id: string | null;
+  character_name: string | null;
   assigned_to: string;
   assigned_by: string | null;
   assigned_at: string;

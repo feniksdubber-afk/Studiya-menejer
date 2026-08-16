@@ -29,7 +29,7 @@ import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
 import { Clapperboard, Languages, Mic2, AudioWaveform, Folder, Users, Film, Pencil, Trash2, Check, X, Loader2, Archive, ArchiveRestore, Image } from "lucide-react";
-import type { Episode, Project, ProjectMember, ProjectRole, Season, User } from "@/types";
+import type { Episode, Project, ProjectMember, ProjectRole, Season, UserSearchResult } from "@/types";
 
 type Tab = "seasons" | "characters" | "team";
 type RoleCategory = "director" | "translator" | "voice_actor" | "sound";
@@ -455,7 +455,7 @@ function AddMemberForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [role, setRole] = useState<ProjectRole>("translator_main");
   const {
     query,

@@ -73,6 +73,7 @@ export type EpisodeStatus = "not_started" | "in_progress" | "revision" | "ready"
 export interface Episode {
   id: string;
   season_id: string;
+  project_id: string;
   title: string;
   order_index: number;
   status: EpisodeStatus;
@@ -159,4 +160,52 @@ export interface Notification {
   payload: Record<string, unknown>;
   is_read: boolean;
   created_at: string;
+}
+
+// ==================== VOICE CUES ("Rollar" / Video Studio) ====================
+
+export type VoiceCueStatus = "pending" | "assigned" | "recorded";
+
+export interface VoiceCueCharacterBrief {
+  id: string;
+  name: string;
+}
+
+export interface VoiceCueActorBrief {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  telegram_username: string | null;
+}
+
+export interface VoiceCue {
+  id: string;
+  episode_id: string;
+  timestamp_seconds: number;
+  screenshot_url: string | null;
+  character: VoiceCueCharacterBrief | null;
+  temp_label: string | null;
+  actor: VoiceCueActorBrief | null;
+  director_note: string | null;
+  status: VoiceCueStatus;
+  order_index: number;
+  created_by: string;
+  created_at: string;
+}
+
+// ==================== ORIGINAL VIDEO (Video Studio pleeri) ====================
+
+export interface OriginalVideo {
+  id: string;
+  episode_id: string | null;
+  current_name: string;
+  mime_type: string | null;
+  file_size: number | null;
+  owner_id: string;
+  created_at: string;
+}
+
+export interface OriginalVideoPlayback {
+  video_url: string;
+  expires_in: number;
 }

@@ -19,9 +19,10 @@
 | VF2 | Cue Capture — 📸 kadr olish, tezkor/batafsil rejim | ✅ bajarildi |
 | VF3 | Cue Editor — forma (yaratish/tahrirlash/duplicate) | ✅ bajarildi (Duplicate — joriy video freymidan, personaj/aktyor/izoh nusxalanadi) |
 | VF4 | Cue Timeline — video ustidagi markerlar | ✅ bajarildi |
-| VF5 | Cue List — filter (personaj/aktyor/status) | ✅ bajarildi (Barchasi/Mening/status tab + personaj/aktyor dropdown) |
+| VF5 | Cue List — filter (personaj/aktyor/status) | ✅ bajarildi (Barchasi/Mening/status tab + personaj/aktyor dropdown, **backend filterlash orqali**) |
 | VF6 | Actor Workspace — aktyor uchun alohida player | ✅ bajarildi (`ActorWorkspace/VoiceCuePlayer.tsx`, `/episodes/:id/voice-cues/mine`, `TaskDetailPage`dan "Ovoz berish" tugmasi ulandi) |
-| VF7 | UX holatlari (loading/empty/error/upload) | ✅ asosiylari bajarildi |
+| VF7 | UX holatlari (loading/empty/error/upload) | ✅ bajarildi (video upload uchun tarmoq xatosi + qayta urinish ham qo'shildi) |
+| — | Desktop ikki ustunli layout | ✅ bajarildi (`lg:` breakpoint) |
 | 1 | `api/models/voice_cues.py` | ✅ bajarildi |
 | 2 | Alembic migratsiya `0007_voice_cues.py` | ✅ bajarildi |
 | 3 | `api/schemas/voice_cues.py` | ✅ bajarildi |
@@ -36,7 +37,29 @@
 | 15 | `npm run build` tekshiruvi | ✅ xatosiz o'tdi |
 | 16 | O'zgargan fayllarni zip qilish + DEPLOY qo'shimchasi | ✅ shu sessiyada |
 
-**Keyingi sessiya uchun eng muhim qolganlar:** VF7'ning qolgan mayda holatlari (tarmoq uzilishi/qayta urinish videoda), desktop ikki ustunli layout, video CORS sozlamasini serverda tekshirish (real R2 bucket'da). Asosiy funksional — director tomon (Video Studio) va aktyor tomon (Actor Workspace) — to'liq ishlaydi.
+**Keyingi sessiya uchun eng muhim qolganlar:** — hammasi bajarildi (quyida).
+Video CORS sozlamasini serverda haqiqiy R2 bucket bilan tekshirish hali
+qoladi — bu infratuzilma (bucket konfiguratsiyasi) bandi, kod bilan hal
+qilinmaydi, deploy vaqtida qo'lda tasdiqlanadi.
+
+**Shu sessiyada qo'shimcha tuzatilgan/tugallangan:**
+- `CueTimeline.tsx`: z-order xatosi — shaffof seek-range marker tugmalarini
+  bosilishini to'sib qo'ygan edi, endi markerlar `z-10`, range `z-0`.
+- `VoiceCueFormModal.tsx`: `character_cast` so'rovi endi render vaqtida emas,
+  `useQuery` bilan to'g'ri lifecycle'da (`characterId` o'zgarganda).
+- `EpisodeVideoStudioPage.tsx`: blob URL (`URL.createObjectURL`) endi
+  `revokeObjectURL` bilan tozalanadi (capture almashtirilganda va unmount'da).
+- **Video yuklash — tarmoq xatosi/qayta urinish (VF7):** endi xato holatida
+  "↻ Qayta urinish" tugmasi chiqadi, fayl qayta tanlanmasdan davom ettiriladi.
+- **Desktop ikki ustunli layout:** `lg:` breakpointda video/timeline chapda
+  (`lg:w-3/5`), ro'yxat o'ngda (`lg:flex-1`) — mobilda bir ustunli tartib
+  saqlanadi.
+- **VF5 filterlari backend orqali:** `CueList` endi barcha cue'larni olib
+  client-side filtrlash o'rniga, `listEpisodeCues` orqali
+  `character_id`/`actor_id`/`status_filter`/`created_by_me` bilan backendga
+  so'rov yuboradi (`useQuery` + `placeholderData` bilan silliq almashish,
+  loading/error holatlari bilan). Timeline markerlari uchun to'liq
+  filtrlanmagan ro'yxat alohida saqlanadi.
 
 **Qoida:** har bir bosqich yozib bo'lingach, shu jadvaldagi holatni ✅ ga
 o'zgartirib qo'yish kerak (fayl tahrirlanadi), shunda progress hech qachon

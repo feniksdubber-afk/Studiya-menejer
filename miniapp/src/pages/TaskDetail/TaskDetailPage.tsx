@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
-import { Upload, CheckCircle2, RotateCcw, History } from "lucide-react";
+import { Upload, CheckCircle2, RotateCcw, History, Mic } from "lucide-react";
 import { getDeadlineHistory, getTask, requestRevision, setTaskStatus } from "@/api/tasks";
 import { getPublicConfig } from "@/api/config";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
@@ -142,6 +142,7 @@ function DeadlineHistorySection({ taskId }: { taskId: string }) {
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
@@ -266,6 +267,15 @@ export default function TaskDetailPage() {
           <p className="font-medium">Qayta topshirish sababi:</p>
           <p className="mt-1">{task.revision_reason}</p>
         </div>
+      )}
+
+      {isAssignee && task.task_type === "voice" && (
+        <button
+          onClick={() => navigate(`/episodes/${task.episode_id}/voice-cues/mine`)}
+          className="flex items-center justify-center gap-2 rounded-xl bg-role-director-600 px-4 py-3 text-sm font-medium text-white"
+        >
+          <Mic size={16} aria-hidden="true" /> Ovoz berish (rollarim)
+        </button>
       )}
 
       {isAssignee &&

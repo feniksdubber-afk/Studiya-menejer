@@ -14,6 +14,10 @@ interface AuthContextValue {
   status: "loading" | "authenticated" | "error" | "unregistered";
   errorMessage: string | null;
   retry: () => void;
+  /** Serverdan yangilangan user obyektini local state'ga yozadi — masalan,
+   * Profil sahifasida rolni almashtirgandan keyin to'liq qayta autentifikatsiya
+   * qilmasdan UI'ni darhol yangilash uchun. */
+  updateUser: (user: User) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -99,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status,
         errorMessage,
         retry: () => setAttempt((n) => n + 1),
+        updateUser: setUser,
       }}
     >
       {children}

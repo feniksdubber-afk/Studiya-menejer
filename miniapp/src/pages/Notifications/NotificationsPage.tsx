@@ -28,6 +28,7 @@ const TYPE_META: Record<string, { label: string; icon: LucideIcon }> = {
   task_delayed: { label: "Deadline o'tib ketdi", icon: AlertTriangle },
   deadline_soon: { label: "Deadline yaqinlashmoqda", icon: Clock3 },
   voice_cue_assigned: { label: "Sizga yangi rol biriktirildi", icon: ClipboardCheck },
+  director_role_requested: { label: "Rejissyor huquqi so'ralmoqda", icon: BellRing },
 };
 
 function metaFor(type: NotificationType) {

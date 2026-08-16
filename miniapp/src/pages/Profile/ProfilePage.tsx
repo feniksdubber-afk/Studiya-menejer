@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { CircleUserRound, Check, ShieldCheck, Clock, XCircle } from "lucide-react";
+import { CircleUserRound, Check, ShieldCheck, Clock, XCircle, Phone } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { Avatar } from "@/components/Avatar";
 import { updateMyRole } from "@/api/users";
@@ -53,6 +53,11 @@ export default function ProfilePage() {
           </span>
           {user.telegram_username && (
             <span className="text-sm text-tg-hint">@{user.telegram_username}</span>
+          )}
+          {user.phone_number && (
+            <span className="mt-0.5 flex items-center gap-1 text-sm text-tg-hint">
+              <Phone size={13} aria-hidden="true" /> {user.phone_number}
+            </span>
           )}
         </div>
       </div>

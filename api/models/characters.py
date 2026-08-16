@@ -18,6 +18,12 @@ class CastType(str, enum.Enum):
     alternate = "alternate"
 
 
+class AniListCharacterRole(str, enum.Enum):
+    main = "main"
+    supporting = "supporting"
+    background = "background"
+
+
 class Character(Base, TimestampMixin):
     __tablename__ = "characters"
 
@@ -25,6 +31,12 @@ class Character(Base, TimestampMixin):
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     anilist_original_name: Mapped[str | None] = mapped_column(String(256))
+
+    # AniList'dan import qilinganda uning ahamiyat darajasi (bosh/ikkinchi
+    # darajali/fon personaji). Qo'lda qo'shilgan personajlar uchun NULL.
+    anilist_role: Mapped[AniListCharacterRole | None] = mapped_column(
+        Enum(AniListCharacterRole, name="character_anilist_role")
+    )
 
     # R2: faqat WebP saqlanadi, original upload fayli saqlanmaydi
     anilist_image_url: Mapped[str | None] = mapped_column(String(1024))

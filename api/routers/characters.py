@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from db.session import get_db
-from models.characters import Character, CharacterCast, ImageSource
+from models.characters import AniListCharacterRole, Character, CharacterCast, ImageSource
 from models.projects import Project
 from models.users import User
 from routers.auth import require_registered_user
@@ -29,6 +29,15 @@ from services.permissions import (
 from services import r2_storage
 
 router = APIRouter(tags=["characters"])
+
+# AniList "role" maydoni katta harflarda keladi (MAIN/SUPPORTING/BACKGROUND) —
+# bizning enum esa kichik harfli. Notanish qiymat kelsa (AniList schema
+# o'zgarsa) xatoga tushmasdan shunchaki None sifatida saqlaymiz.
+_ANILIST_ROLE_MAP = {
+    "MAIN": AniListCharacterRole.main,
+    "SUPPORTING": AniListCharacterRole.supporting,
+    "BACKGROUND": AniListCharacterRole.background,
+}
 
 
 def _with_display_url(character: Character, can_manage: bool = False) -> CharacterOut:
@@ -87,6 +96,7 @@ async def create_character(
         name=payload.name,
         anilist_original_name=payload.anilist_original_name,
         anilist_image_url=payload.anilist_image_url,
+        anilist_role=_ANILIST_ROLE_MAP.get((payload.anilist_role or "").upper()),
         image_source=ImageSource.anilist,
         created_by=user.id,
     )

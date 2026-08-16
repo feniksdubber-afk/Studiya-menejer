@@ -6,12 +6,16 @@ import { Upload, CheckCircle2, RotateCcw, History, Mic, UserCog } from "lucide-r
 import { getDeadlineHistory, getTask, requestRevision, setTaskStatus, updateTask } from "@/api/tasks";
 import { getEpisode, listProjectMembers } from "@/api/projects";
 import { getPublicConfig } from "@/api/config";
+import { getTaskSubmittedFile, getUpstreamTaskFile } from "@/api/files";
+import { getOriginalVideoPlaybackUrl } from "@/api/originalVideo";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
 import { QueryError, LoadingScreen } from "@/components/StatusScreens";
+import { TaskFileCard, TaskFileSection } from "@/components/TaskFileCard";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/auth/useAuth";
+import type { TaskType } from "@/types";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
   translation: "Tarjima",
@@ -19,6 +23,84 @@ const TASK_TYPE_LABEL: Record<string, string> = {
   sound_video: "Video montaj",
   sound_audio: "Audio montaj",
 };
+
+// Har bir vazifa turi ish boshlashdan oldin nimani ko'rishi/eshitishi kerak
+// ekanini tavsiflaydi — TaskDetailPage'da "Material" bo'limi shunga qarab
+// chiqadi. `translation`/`voice` uchun original video (Video Studio orqali
+// alohida endpoint), `sound_audio`/`sound_video` uchun esa oldingi bosqich
+// natijasi (/episodes/{id}/upstream-file).
+const UPSTREAM_LABEL: Record<TaskType, string> = {
+  translation: "Original video",
+  voice: "Original video",
+  sound_audio: "Ovoz yozuvi (aktyordan)",
+  sound_video: "Audio montaj natijasi",
+};
+
+/** Vazifani boshlashdan oldin kerak bo'ladigan materialni ko'rsatadi:
+ *  original video (tarjimon/ovoz aktyori) yoki oldingi bosqich fayli
+ *  (svedeniyachi — audio yoki video montaj). */
+function UpstreamMaterialSection({
+  episodeId,
+  taskType,
+  characterId,
+}: {
+  episodeId: string;
+  taskType: TaskType;
+  characterId: string | null;
+}) {
+  const isVideoUpstream = taskType === "translation" || taskType === "voice";
+
+  const videoQuery = useQuery({
+    queryKey: ["episode-video", episodeId],
+    queryFn: () => getOriginalVideoPlaybackUrl(episodeId),
+    enabled: isVideoUpstream,
+  });
+
+  if (isVideoUpstream) {
+    if (videoQuery.isLoading) return null;
+    if (!videoQuery.data) {
+      return (
+        <div className="rounded-2xl bg-tg-secondaryBg p-4 text-sm text-tg-hint">
+          Bu qism uchun original video hali yuklanmagan.
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-tg-hint">{UPSTREAM_LABEL[taskType]}</span>
+        <video src={videoQuery.data.video_url} controls playsInline className="w-full rounded-2xl bg-black" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-tg-hint">{UPSTREAM_LABEL[taskType]}</span>
+      <TaskFileSection
+        title={UPSTREAM_LABEL[taskType]}
+        emptyMessage="Oldingi bosqich hali fayl topshirmagan."
+        accentClassName="bg-role-translator-50 text-role-translator-800"
+        queryKey={["upstream-file", episodeId, taskType, characterId]}
+        queryFn={() => getUpstreamTaskFile(episodeId, taskType, characterId)}
+      />
+    </div>
+  );
+}
+
+/** Joriy vazifaning o'zi topshirgan eng so'nggi faylini ko'rsatadi. Fayl
+ *  hali topshirilmagan bo'lishi normal holat (masalan status hali
+ *  "pending"), shuning uchun bunday holatda hech narsa chizmaydi — xato
+ *  yoki bo'sh karta bilan ekranni band qilmaydi. */
+function SubmittedFileSection({ taskId }: { taskId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["task-file", taskId],
+    queryFn: () => getTaskSubmittedFile(taskId),
+  });
+
+  if (isLoading || !data) return null;
+
+  return <TaskFileCard title="Topshirilgan fayl" file={data} accentClassName="bg-role-sound-50 text-role-sound-800" />;
+}
 
 function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
@@ -365,6 +447,29 @@ export default function TaskDetailPage() {
           <p className="mt-1">{task.revision_reason}</p>
         </div>
       )}
+
+      {/* Ish uchun material: tarjimon/ovoz aktyori uchun original video,
+          svedeniyachi uchun oldingi bosqich (ovoz/audio montaj) fayli.
+          Faqat ijrochi va boshqaruvchilarga ko'rsatiladi — boshqa a'zolar
+          uchun ahamiyatsiz. */}
+      {(isAssignee || canAct) && (
+        <UpstreamMaterialSection
+          episodeId={task.episode_id}
+          taskType={task.task_type}
+          characterId={task.character_id}
+        />
+      )}
+
+      {/* Ijrochi/rejissyor joriy vazifa uchun allaqachon topshirilgan
+          faylni shu yerdan qayta ko'rishi/eshitishi mumkin — botga
+          qaytmasdan. Fayl hali topshirilmagan bo'lsa hech narsa ko'rinmaydi
+          (bo'sh xabar bilan ekranni band qilmaslik uchun). */}
+      {(isAssignee || canAct) &&
+        (task.status === "submitted" ||
+          task.status === "accepted" ||
+          task.status === "revision_requested") && (
+          <SubmittedFileSection taskId={task.id} />
+        )}
 
       {isAssignee && task.task_type === "voice" && (
         <button

@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
-import { Upload, CheckCircle2, RotateCcw, History, Mic } from "lucide-react";
-import { getDeadlineHistory, getTask, requestRevision, setTaskStatus } from "@/api/tasks";
+import { Upload, CheckCircle2, RotateCcw, History, Mic, UserCog } from "lucide-react";
+import { getDeadlineHistory, getTask, requestRevision, setTaskStatus, updateTask } from "@/api/tasks";
+import { getEpisode, listProjectMembers } from "@/api/projects";
 import { getPublicConfig } from "@/api/config";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { DeadlineRing } from "@/components/DeadlineRing";
@@ -102,6 +103,101 @@ function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () =>
   );
 }
 
+function ReassignTaskForm({
+  taskId,
+  episodeId,
+  currentAssignedTo,
+  currentDeadline,
+  onDone,
+}: {
+  taskId: string;
+  episodeId: string;
+  currentAssignedTo: string;
+  currentDeadline: string | null;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
+  const [assignedTo, setAssignedTo] = useState(currentAssignedTo);
+  const [deadline, setDeadline] = useState(
+    currentDeadline ? currentDeadline.slice(0, 16) : ""
+  );
+
+  const { data: episode } = useQuery({
+    queryKey: ["episode", episodeId],
+    queryFn: () => getEpisode(episodeId),
+  });
+
+  const { data: members } = useQuery({
+    queryKey: ["project-members", episode?.project_id],
+    queryFn: () => listProjectMembers(episode!.project_id),
+    enabled: !!episode?.project_id,
+  });
+
+  const { mutate: submit, isPending } = useMutation({
+    mutationFn: () =>
+      updateTask(taskId, {
+        assigned_to: assignedTo !== currentAssignedTo ? assignedTo : undefined,
+        deadline: deadline ? new Date(deadline).toISOString() : null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+      WebApp.HapticFeedback.notificationOccurred("success");
+      showSuccess("Vazifa yangilandi.");
+      onDone();
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Vazifani yangilab bo'lmadi.");
+    },
+  });
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl bg-tg-secondaryBg p-4">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-tg-hint">Tayinlanuvchi</span>
+        <select
+          value={assignedTo}
+          onChange={(e) => setAssignedTo(e.target.value)}
+          className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+        >
+          {members?.map((m) => (
+            <option key={m.id} value={m.user_id}>
+              {m.user.first_name} {m.user.last_name ?? ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-tg-hint">Deadline</span>
+        <input
+          type="datetime-local"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onDone}
+          className="flex-1 rounded-xl bg-tg-bg py-2.5 text-sm font-medium text-tg-hint"
+        >
+          Bekor qilish
+        </button>
+        <button
+          type="button"
+          onClick={() => submit()}
+          disabled={isPending || !assignedTo}
+          className="flex-[2] rounded-xl bg-tg-button py-2.5 text-sm font-medium text-tg-buttonText disabled:opacity-50"
+        >
+          {isPending ? "Saqlanmoqda..." : "Saqlash"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DeadlineHistorySection({ taskId }: { taskId: string }) {
   const { data: history, isError, refetch } = useQuery({
     queryKey: ["deadline-history", taskId],
@@ -147,6 +243,7 @@ export default function TaskDetailPage() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isReassigning, setIsReassigning] = useState(false);
   useTelegramBackButton("/tasks");
 
   const { data: task, isLoading, isError, refetch } = useQuery({
@@ -321,6 +418,28 @@ export default function TaskDetailPage() {
             </button>
           )}
         </div>
+      )}
+
+      {canAct && task.status !== "accepted" && !isRejecting && !isReassigning && (
+        <button
+          onClick={() => {
+            WebApp.HapticFeedback.impactOccurred("light");
+            setIsReassigning(true);
+          }}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-tg-hint/40 px-4 py-3 text-sm font-medium text-tg-button"
+        >
+          <UserCog size={16} aria-hidden="true" /> Qayta tayinlash / deadline o'zgartirish
+        </button>
+      )}
+
+      {isReassigning && (
+        <ReassignTaskForm
+          taskId={task.id}
+          episodeId={task.episode_id}
+          currentAssignedTo={task.assigned_to}
+          currentDeadline={task.deadline}
+          onDone={() => setIsReassigning(false)}
+        />
       )}
 
       {isRejecting && (

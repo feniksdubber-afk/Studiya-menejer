@@ -40,6 +40,12 @@ def _project_out(project: Project, can_manage: bool) -> ProjectOut:
     return out
 
 
+def _episode_out(episode: Episode, project_id: uuid.UUID) -> EpisodeOut:
+    out = EpisodeOut.model_validate(episode)
+    out.project_id = project_id
+    return out
+
+
 # ==================== PROJECTS ====================
 
 @router.post("/projects", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
@@ -354,7 +360,7 @@ async def list_episodes(
     result = await db.execute(
         select(Episode).where(Episode.season_id == season_id).order_by(Episode.order_index)
     )
-    return result.scalars().all()
+    return [_episode_out(ep, project.id) for ep in result.scalars().all()]
 
 
 @router.post("/seasons/{season_id}/episodes", response_model=EpisodeOut, status_code=status.HTTP_201_CREATED)
@@ -377,7 +383,7 @@ async def create_episode(
     db.add(episode)
     await db.commit()
     await db.refresh(episode)
-    return episode
+    return _episode_out(episode, project.id)
 
 
 async def _get_episode_or_404(db: AsyncSession, episode_id: uuid.UUID) -> Episode:
@@ -399,7 +405,7 @@ async def get_episode(
         membership = await get_membership(db, season.project_id, user.id)
         if membership is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu loyiha a'zosi emassiz")
-    return episode
+    return _episode_out(episode, season.project_id)
 
 
 @router.patch("/episodes/{episode_id}", response_model=EpisodeOut)
@@ -423,7 +429,7 @@ async def update_episode(
         episode.status = manual_status
     await db.commit()
     await db.refresh(episode)
-    return episode
+    return _episode_out(episode, project.id)
 
 
 @router.delete("/episodes/{episode_id}", status_code=status.HTTP_204_NO_CONTENT)

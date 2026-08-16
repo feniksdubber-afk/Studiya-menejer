@@ -33,6 +33,7 @@ class TaskOut(BaseModel):
     episode_id: uuid.UUID
     task_type: TaskType
     character_id: uuid.UUID | None
+    character_name: str | None = None
     assigned_to: uuid.UUID
     assigned_by: uuid.UUID | None
     assigned_at: datetime

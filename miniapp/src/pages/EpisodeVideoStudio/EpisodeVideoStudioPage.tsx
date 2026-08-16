@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { UploadCloud, Theater } from "lucide-react";
+import WebApp from "@twa-dev/sdk";
+import { UploadCloud, Theater, Trash2 } from "lucide-react";
 import { getEpisode } from "@/api/projects";
 import { listCharacters } from "@/api/characters";
 import { listProjectMembers } from "@/api/projects";
@@ -9,6 +10,7 @@ import {
   getOriginalVideoPlaybackUrl,
   requestOriginalVideoUploadUrl,
   confirmOriginalVideoUpload,
+  deleteOriginalVideo,
   uploadVideoToR2,
   MAX_VIDEO_SIZE_BYTES,
 } from "@/api/originalVideo";
@@ -171,6 +173,24 @@ export default function EpisodeVideoStudioPage() {
     setEditingCue(cue);
   };
 
+  const deleteVideoMutation = useMutation({
+    mutationFn: () => deleteOriginalVideo(episodeId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["episode-video", episodeId] });
+      showSuccess("Video o'chirildi");
+    },
+    onError: () => showError("Videoni o'chirib bo'lmadi"),
+  });
+
+  const handleDeleteVideo = () => {
+    WebApp.showConfirm(
+      "Videoni o'chirmoqchimisiz? Yangisini yuklaguningizcha bu qismda video bo'lmaydi.",
+      (ok) => {
+        if (ok) deleteVideoMutation.mutate();
+      }
+    );
+  };
+
   const handleUploadVideo = async (file: File) => {
     if (!episodeId) return;
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
@@ -312,6 +332,14 @@ export default function EpisodeVideoStudioPage() {
                   }}
                 />
               )}
+              <button
+                onClick={handleDeleteVideo}
+                disabled={deleteVideoMutation.isPending}
+                className="flex items-center justify-center gap-2 rounded-xl bg-tg-secondaryBg px-4 py-2.5 text-sm font-medium text-role-voice-600 disabled:opacity-50"
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                {deleteVideoMutation.isPending ? "O'chirilmoqda..." : "Videoni o'chirish"}
+              </button>
             </>
           )}
         </div>

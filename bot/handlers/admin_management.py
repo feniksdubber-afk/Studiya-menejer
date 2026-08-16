@@ -22,6 +22,7 @@ from sqlalchemy import select
 from db import get_session
 from keyboards.registration import director_approval_keyboard
 from models.users import DirectorStatus, User
+from utils.timefmt import format_dt
 
 router = Router(name="admin_management")
 
@@ -52,7 +53,7 @@ async def list_pending(message: Message):
     for user in pending_users:
         full_name = f"{user.first_name} {user.last_name or ''}".strip()
         username_line = f"@{user.telegram_username}" if user.telegram_username else "(username yo'q)"
-        created = user.created_at.strftime("%d-%B %H:%M") if user.created_at else "—"
+        created = format_dt(user.created_at, fmt="%d-%B %H:%M", default="—")
         text = (
             "🎬 Rejissyorlik so'rovi\n\n"
             f"👤 {full_name}\n"

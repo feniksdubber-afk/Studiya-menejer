@@ -81,6 +81,7 @@ export interface Episode {
 
 export type ImageSource = "anilist" | "custom";
 export type CastType = "main" | "alternate";
+export type AniListCharacterRole = "main" | "supporting" | "background";
 
 export interface Character {
   id: string;
@@ -88,6 +89,7 @@ export interface Character {
   name: string;
   anilist_original_name: string | null;
   anilist_image_url: string | null;
+  anilist_role: AniListCharacterRole | null;
   custom_image_key: string | null;
   image_source: ImageSource;
   is_active: boolean;

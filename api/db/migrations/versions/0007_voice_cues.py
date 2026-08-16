@@ -21,8 +21,6 @@ voice_cue_status = sa.Enum("pending", "assigned", "recorded", name="voice_cue_st
 
 
 def upgrade() -> None:
-    voice_cue_status.create(op.get_bind())
-
     op.create_table(
         "voice_cues",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),

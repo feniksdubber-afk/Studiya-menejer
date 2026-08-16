@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import get_db
+from models.characters import Character
 from models.projects import Episode
 from models.tasks import DeadlineHistory, Task, TaskStatus, TaskType
 from models.users import User
@@ -30,10 +31,29 @@ from services.task_engine import recompute_episode_status
 router = APIRouter(tags=["tasks"])
 
 
-def _task_out(task: Task, can_manage: bool) -> TaskOut:
+def _task_out(task: Task, can_manage: bool, character_name: str | None = None) -> TaskOut:
     out = TaskOut.model_validate(task)
     out.can_manage = can_manage
+    out.character_name = character_name
     return out
+
+
+async def _get_character_name(db: AsyncSession, character_id: uuid.UUID | None) -> str | None:
+    """Bitta vazifa uchun personaj nomi (yagona-task endpointlar uchun)."""
+    if character_id is None:
+        return None
+    character = await db.get(Character, character_id)
+    return character.name if character is not None else None
+
+
+async def _character_names(db: AsyncSession, tasks: list[Task]) -> dict[uuid.UUID, str]:
+    """Bir nechta task uchun character_id -> name xaritasini bitta so'rov
+    bilan oladi (N+1 so'rovlarning oldini olish uchun — ro'yxat endpointlari)."""
+    character_ids = {t.character_id for t in tasks if t.character_id is not None}
+    if not character_ids:
+        return {}
+    result = await db.execute(select(Character).where(Character.id.in_(character_ids)))
+    return {c.id: c.name for c in result.scalars().all()}
 
 
 async def _get_episode_and_project(db: AsyncSession, episode_id: uuid.UUID):
@@ -78,8 +98,10 @@ async def list_episode_tasks(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu loyiha a'zosi emassiz")
 
     result = await db.execute(select(Task).where(Task.episode_id == episode_id))
+    tasks = list(result.scalars().all())
     can_manage = await is_project_director(db, project.id, user)
-    return [_task_out(t, can_manage) for t in result.scalars().all()]
+    names = await _character_names(db, tasks)
+    return [_task_out(t, can_manage, names.get(t.character_id)) for t in tasks]
 
 
 @router.get("/tasks/mine", response_model=list[TaskOut])
@@ -106,12 +128,13 @@ async def list_my_tasks(
     # Har bir task boshqa loyihaga tegishli bo'lishi mumkin — loyiha
     # bo'yicha natijani keshlab, takroriy so'rovlarning oldini olamiz.
     project_can_manage_cache: dict[uuid.UUID, bool] = {}
+    names = await _character_names(db, tasks)
     out: list[TaskOut] = []
     for t in tasks:
         _, project = await _get_episode_and_project(db, t.episode_id)
         if project.id not in project_can_manage_cache:
             project_can_manage_cache[project.id] = await is_project_director(db, project.id, user)
-        out.append(_task_out(t, project_can_manage_cache[project.id]))
+        out.append(_task_out(t, project_can_manage_cache[project.id], names.get(t.character_id)))
     return out
 
 
@@ -160,7 +183,8 @@ async def create_task(
         type_="task_assigned",
         payload={"task_id": str(task.id), "episode_id": str(episode_id), "task_type": task.task_type.value},
     )
-    return _task_out(task, can_manage=True)
+    character_name = await _get_character_name(db, task.character_id)
+    return _task_out(task, can_manage=True, character_name=character_name)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
@@ -173,7 +197,8 @@ async def get_task(
     await _check_task_view_access(db, task, user)
     _, project = await _get_episode_and_project(db, task.episode_id)
     can_manage = await is_project_director(db, project.id, user)
-    return _task_out(task, can_manage)
+    character_name = await _get_character_name(db, task.character_id)
+    return _task_out(task, can_manage, character_name)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskOut)
@@ -196,10 +221,18 @@ async def update_task(
 
     data = payload.model_dump(exclude_unset=True)
     old_assignee = task.assigned_to
+    deadline_changed = "deadline" in data and data["deadline"] != task.deadline
     for field, value in data.items():
         setattr(task, field, value)
     if payload.assigned_to is not None and payload.assigned_to != old_assignee:
         task.assigned_by = user.id
+    if deadline_changed:
+        # Deadline to'g'ridan-to'g'ri (request-revision'siz) o'zgartirilganda
+        # ham 3-soatlik eslatma bayrog'ini tiklash kerak — aks holda, agar
+        # eski deadline uchun eslatma allaqachon yuborilgan bo'lsa, yangi
+        # deadline uchun eslatma hech qachon yubormaydi (notified_3h True
+        # bo'lib qolaveradi).
+        task.notified_3h = False
     await db.commit()
     await db.refresh(task)
 
@@ -210,7 +243,8 @@ async def update_task(
             type_="task_assigned",
             payload={"task_id": str(task.id), "episode_id": str(task.episode_id)},
         )
-    return _task_out(task, can_manage=True)
+    character_name = await _get_character_name(db, task.character_id)
+    return _task_out(task, can_manage=True, character_name=character_name)
 
 
 @router.post("/tasks/{task_id}/status", response_model=TaskOut)
@@ -263,7 +297,8 @@ async def set_task_status(
                 payload={"task_id": str(task.id)},
             )
 
-    return _task_out(task, is_privileged)
+    character_name = await _get_character_name(db, task.character_id)
+    return _task_out(task, is_privileged, character_name)
 
 
 @router.post("/tasks/{task_id}/request-revision", response_model=TaskOut)
@@ -304,7 +339,8 @@ async def request_revision(
         type_="task_revision_requested",
         payload={"task_id": str(task.id), "reason": payload.reason},
     )
-    return _task_out(task, can_manage=True)
+    character_name = await _get_character_name(db, task.character_id)
+    return _task_out(task, can_manage=True, character_name=character_name)
 
 
 @router.get("/tasks/{task_id}/deadline-history", response_model=list[DeadlineHistoryOut])

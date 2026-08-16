@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from core.config import settings
-from routers import anilist, auth, characters, internal, notifications, projects, tasks, users, voice_cues
+from routers import anilist, auth, characters, files, internal, notifications, projects, tasks, users, voice_cues
 
 app = FastAPI(title="AFSONA DUB API")
 
@@ -14,6 +14,7 @@ app.include_router(anilist.router)
 app.include_router(users.router)
 app.include_router(notifications.router)
 app.include_router(voice_cues.router)
+app.include_router(files.router)
 
 
 @app.get("/health")

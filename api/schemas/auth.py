@@ -2,6 +2,8 @@ import uuid
 
 from pydantic import BaseModel
 
+from models.users import UserRole
+
 
 class TelegramAuthRequest(BaseModel):
     init_data: str  # Mini App'dan kelgan xom Telegram.WebApp.initData satri
@@ -33,6 +35,15 @@ class UserOut(BaseModel):
     is_super_admin: bool
 
     model_config = {"from_attributes": True}
+
+
+class RoleUpdateRequest(BaseModel):
+    """Ro'yxatdan o'tgan foydalanuvchi o'z umumiy rolini o'zi almashtirishi
+    uchun (Profil sahifasi). Rejissyorlikka o'tish admin tasdig'ini talab
+    qiladi — bu bot orqali dastlabki registratsiyadagi bilan bir xil qoida
+    (qarang: bot/handlers/registration.py:process_role)."""
+
+    role: UserRole
 
 
 class AuthResponse(BaseModel):

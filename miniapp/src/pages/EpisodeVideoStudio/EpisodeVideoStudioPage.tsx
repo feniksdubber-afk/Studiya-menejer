@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { UploadCloud, Theater } from "lucide-react";
 import { getEpisode } from "@/api/projects";
-import { listCharacters, listCharacterCast } from "@/api/characters";
+import { listCharacters } from "@/api/characters";
 import { listProjectMembers } from "@/api/projects";
 import {
   getOriginalVideoPlaybackUrl,
@@ -44,6 +44,8 @@ export default function EpisodeVideoStudioPage() {
   const [lastCharacterId, setLastCharacterId] = useState<string | null>(null);
   const [lastActorId, setLastActorId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const episodeQuery = useQuery({
@@ -72,26 +74,14 @@ export default function EpisodeVideoStudioPage() {
     enabled: !!projectId,
   });
 
+  // Filtrlanmagan to'liq ro'yxat — video timeline markerlari (VF4) va
+  // sarlavhadagi umumiy son uchun. CueList (VF5) esa o'z filtrlangan
+  // so'rovini backend orqali alohida yuboradi.
   const cuesQuery = useQuery({
     queryKey: ["episode-cues", episodeId],
     queryFn: () => listEpisodeCues(episodeId!),
     enabled: !!episodeId,
   });
-
-  // Tanlangan personajga biriktirilgan aktyorlar — dropdown'da yulduzcha bilan
-  // tepaga chiqarish uchun (VF3). Ehtiyotkorlik bilan lazy-cache qilamiz.
-  const castCache = useRef<Map<string, Set<string>>>(new Map());
-  const [, forceRerender] = useState(0);
-  const castActorIdsForCharacter = (characterId: string): Set<string> => {
-    if (!castCache.current.has(characterId)) {
-      castCache.current.set(characterId, new Set());
-      listCharacterCast(characterId).then((cast) => {
-        castCache.current.set(characterId, new Set(cast.map((c) => c.user_id)));
-        forceRerender((n) => n + 1);
-      });
-    }
-    return castCache.current.get(characterId)!;
-  };
 
   const createMutation = useMutation({
     mutationFn: (values: VoiceCueFormValues & { screenshot: Blob }) =>
@@ -161,8 +151,19 @@ export default function EpisodeVideoStudioPage() {
 
   const handleCapture = (blob: Blob, timestampSeconds: number) => {
     const previewUrl = URL.createObjectURL(blob);
-    setPendingCapture({ blob, previewUrl, timestampSeconds });
+    setPendingCapture((prev) => {
+      // Oldingi captureni almashtirsak, uning blob URL'ini ham tozalaymiz.
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return { blob, previewUrl, timestampSeconds };
+    });
   };
+
+  // pendingCapture tugaganda (saqlangan/bekor qilingan) yoki komponent
+  // unmount bo'lganda blob URL'ni xotiradan tozalaymiz — memory leak oldini olish.
+  useEffect(() => {
+    if (!pendingCapture) return;
+    return () => URL.revokeObjectURL(pendingCapture.previewUrl);
+  }, [pendingCapture]);
 
   const handleSelectCue = (cue: VoiceCue) => {
     setActiveCueId(cue.id);
@@ -176,6 +177,8 @@ export default function EpisodeVideoStudioPage() {
       showError("Video hajmi 500 MB dan oshmasligi kerak");
       return;
     }
+    setPendingFile(file);
+    setUploadError(null);
     try {
       setUploadProgress(0);
       const { upload_url, r2_key } = await requestOriginalVideoUploadUrl(
@@ -187,11 +190,22 @@ export default function EpisodeVideoStudioPage() {
       await confirmOriginalVideoUpload(episodeId, r2_key, file.name, file.type || "video/mp4");
       await queryClient.invalidateQueries({ queryKey: ["episode-video", episodeId] });
       showSuccess("Video yuklandi");
-    } catch {
-      showError("Videoni yuklab bo'lmadi");
+      setPendingFile(null);
+    } catch (err: any) {
+      // Tarmoq uzilishi yoki R2/API xatosi — foydalanuvchi faylni qayta
+      // tanlamasdan "Qayta urinish" bosishi mumkin (VF7).
+      const message =
+        err?.message === "Tarmoq xatosi — video yuklab bo'lmadi"
+          ? "Tarmoq uzildi — internet aloqasini tekshirib, qayta urinib ko'ring."
+          : "Videoni yuklab bo'lmadi. Qayta urinib ko'ring.";
+      setUploadError(message);
     } finally {
       setUploadProgress(null);
     }
+  };
+
+  const handleRetryUpload = () => {
+    if (pendingFile) handleUploadVideo(pendingFile);
   };
 
   if (episodeQuery.isLoading || videoQuery.isLoading) {
@@ -210,7 +224,7 @@ export default function EpisodeVideoStudioPage() {
   const video = videoQuery.data;
 
   return (
-    <div className="flex flex-col gap-4 p-5 pt-6 pb-24">
+    <div className="flex flex-col gap-4 p-5 pt-6 pb-24 lg:mx-auto lg:max-w-6xl">
       <div>
         <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
           <Theater size={18} aria-hidden="true" /> Rollar
@@ -218,74 +232,106 @@ export default function EpisodeVideoStudioPage() {
         <p className="text-sm text-tg-hint">{episode.title}</p>
       </div>
 
-      {!video ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl bg-tg-secondaryBg px-4 py-10 text-center">
-          <UploadCloud size={26} className="text-tg-hint" aria-hidden="true" />
-          <p className="text-sm text-tg-hint">
-            Bu qism uchun video hali yuklanmagan. Video yuklab, "rol" yaratishni boshlang.
-          </p>
-          {uploadProgress !== null ? (
-            <div className="w-full max-w-xs">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-tg-bg">
-                <div
-                  className="h-full rounded-full bg-role-director-600 transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-              <p className="mt-1 font-mono text-xs text-tg-hint">{uploadProgress}%</p>
+      {/* Mobilda bir ustun (video → ro'yxat, tepadan pastga), desktopda
+          (lg+) ikki ustun: chapda video/timeline, o'ngda ro'yxat — kattaroq
+          ekranda ikkalasini bir vaqtda ko'rish uchun. */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+        <div className="flex flex-col gap-4 lg:w-3/5 lg:shrink-0">
+          {!video ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl bg-tg-secondaryBg px-4 py-10 text-center">
+              <UploadCloud size={26} className="text-tg-hint" aria-hidden="true" />
+              <p className="text-sm text-tg-hint">
+                Bu qism uchun video hali yuklanmagan. Video yuklab, "rol" yaratishni boshlang.
+              </p>
+              {uploadProgress !== null ? (
+                <div className="w-full max-w-xs">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-tg-bg">
+                    <div
+                      className="h-full rounded-full bg-role-director-600 transition-all"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-tg-hint">{uploadProgress}%</p>
+                </div>
+              ) : uploadError ? (
+                <div className="flex w-full max-w-xs flex-col items-center gap-2">
+                  <p className="text-xs text-role-voice-600">{uploadError}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRetryUpload}
+                      className="rounded-xl bg-tg-button px-5 py-2.5 text-sm font-medium text-tg-buttonText"
+                    >
+                      ↻ Qayta urinish
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUploadError(null);
+                        setPendingFile(null);
+                        fileInputRef.current?.click();
+                      }}
+                      className="rounded-xl bg-tg-secondaryBg px-5 py-2.5 text-sm font-medium text-tg-text"
+                    >
+                      Boshqa fayl
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl bg-tg-button px-5 py-2.5 text-sm font-medium text-tg-buttonText"
+                >
+                  Video yuklash
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadVideo(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-xl bg-tg-button px-5 py-2.5 text-sm font-medium text-tg-buttonText"
-            >
-              Video yuklash
-            </button>
+            <>
+              <VideoPlayer
+                ref={playerRef}
+                src={video.video_url}
+                cues={cues}
+                activeCueId={activeCueId}
+                onCapture={handleCapture}
+              />
+              {activeCueId && (
+                <JumpToActiveCueButton
+                  onClick={() => {
+                    const cue = cues.find((c) => c.id === activeCueId);
+                    if (cue) playerRef.current?.seekTo(cue.timestamp_seconds);
+                  }}
+                />
+              )}
+            </>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUploadVideo(file);
-              e.target.value = "";
-            }}
-          />
         </div>
-      ) : (
-        <>
-          <VideoPlayer
-            ref={playerRef}
-            src={video.video_url}
-            cues={cues}
-            activeCueId={activeCueId}
-            onCapture={handleCapture}
-          />
-          {activeCueId && (
-            <JumpToActiveCueButton
-              onClick={() => {
-                const cue = cues.find((c) => c.id === activeCueId);
-                if (cue) playerRef.current?.seekTo(cue.timestamp_seconds);
-              }}
+
+        <div className="lg:flex-1">
+          {cuesQuery.isError ? (
+            <QueryError message="Rollarni yuklab bo'lmadi." onRetry={() => cuesQuery.refetch()} />
+          ) : (
+            <CueList
+              episodeId={episodeId!}
+              allCuesCount={cues.length}
+              activeCueId={activeCueId}
+              currentUserId={user?.id}
+              characters={charactersQuery.data ?? []}
+              members={membersQuery.data ?? []}
+              onSelect={handleSelectCue}
             />
           )}
-        </>
-      )}
-
-      {cuesQuery.isError ? (
-        <QueryError message="Rollarni yuklab bo'lmadi." onRetry={() => cuesQuery.refetch()} />
-      ) : (
-        <CueList
-          cues={cues}
-          activeCueId={activeCueId}
-          currentUserId={user?.id}
-          characters={charactersQuery.data ?? []}
-          members={membersQuery.data ?? []}
-          onSelect={handleSelectCue}
-        />
-      )}
+        </div>
+      </div>
 
       {pendingCapture && (
         <VoiceCueFormModal
@@ -293,7 +339,6 @@ export default function EpisodeVideoStudioPage() {
           timestampSeconds={pendingCapture.timestampSeconds}
           characters={charactersQuery.data ?? []}
           members={membersQuery.data ?? []}
-          castActorIdsForCharacter={castActorIdsForCharacter}
           defaultCharacterId={lastCharacterId}
           defaultActorId={lastActorId}
           saving={createMutation.isPending}
@@ -310,7 +355,6 @@ export default function EpisodeVideoStudioPage() {
           timestampSeconds={editingCue.timestamp_seconds}
           characters={charactersQuery.data ?? []}
           members={membersQuery.data ?? []}
-          castActorIdsForCharacter={castActorIdsForCharacter}
           existingCue={editingCue}
           saving={updateMutation.isPending}
           onClose={() => setEditingCue(null)}

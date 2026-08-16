@@ -276,3 +276,51 @@ async def delete_voice_cue(
     await db.commit()
 
     r2_storage.delete_object(screenshot_key)
+
+
+# ==================== DUPLICATE ====================
+
+@router.post(
+    "/voice-cues/{cue_id}/duplicate",
+    response_model=VoiceCueOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_voice_cue(
+    cue_id: uuid.UUID,
+    screenshot: UploadFile,
+    timestamp_seconds: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    """Mavjud cue'dan personaj/aktyor/izohni nusxalab, yangi skrinshot +
+    vaqt bilan yangi cue yaratadi (VOICE-CUES-PLAN.md, VF3). status va
+    director_note maqsadli ravishda nusxalanmaydi — bo'sh/pending boshlanadi,
+    faqat izoh nusxalanadi chunki odatda bir xil ko'rsatma qayta ishlatiladi."""
+    source = await _get_cue_or_404(db, cue_id)
+    episode, project = await _get_episode_and_project(db, source.episode_id)
+    await require_project_member(project, user, db)
+
+    raw = await screenshot.read()
+    webp_bytes = validate_and_convert_to_webp(raw, max_bytes=settings.voice_cue_screenshot_max_bytes)
+    screenshot_key = r2_storage.build_object_key(prefix=_SCREENSHOT_PREFIX)
+    r2_storage.upload_webp(screenshot_key, webp_bytes)
+
+    cue = VoiceCue(
+        id=uuid.uuid4(),
+        episode_id=source.episode_id,
+        timestamp_seconds=timestamp_seconds,
+        screenshot_key=screenshot_key,
+        character_id=source.character_id,
+        temp_label=source.temp_label,
+        actor_id=source.actor_id,
+        director_note=source.director_note,
+        status=VoiceCueStatus.assigned if source.actor_id is not None else VoiceCueStatus.pending,
+        created_by=user.id,
+    )
+    db.add(cue)
+    await db.commit()
+    await db.refresh(cue)
+
+    await _notify_actor_assigned(db, cue, episode)
+
+    return await _cue_out(db, cue)

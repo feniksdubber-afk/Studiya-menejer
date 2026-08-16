@@ -25,6 +25,7 @@ from models.projects import Episode, Project, Season
 from models.tasks import Task, TaskStatus, TaskType
 from models.users import User
 from services.api_client import InternalApiError, mark_overdue_tasks
+from utils.timefmt import format_dt
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ async def _notify_one(db, bot: Bot, task: Task) -> None:
 
     project_title = project.title if project else "?"
     task_label = _TASK_TYPE_LABELS.get(task.task_type, str(task.task_type.value))
-    deadline_str = task.deadline.strftime("%d-%m %H:%M") if task.deadline else "-"
+    deadline_str = format_dt(task.deadline)
 
     lines = [
         "⏰ Deadline'ga 3 soat qoldi",
@@ -161,7 +162,7 @@ async def _push_overdue_message(db, bot: Bot, task_id: uuid.UUID) -> None:
 
     task_label = _TASK_TYPE_LABELS.get(task.task_type, str(task.task_type.value))
     project_title = project.title if project else "?"
-    deadline_str = task.deadline.strftime("%d-%m %H:%M") if task.deadline else "-"
+    deadline_str = format_dt(task.deadline)
 
     text = (
         "⚠️ Deadline o'tib ketdi\n\n"

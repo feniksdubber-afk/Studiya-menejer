@@ -25,6 +25,7 @@ from models.characters import Character
 from models.projects import Episode, Project, Season
 from models.tasks import Task, TaskType
 from models.users import User
+from utils.timefmt import format_dt
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,7 @@ async def _build_task_assigned(db, payload: dict) -> str | None:
         lines.append(f"🎭 {character.name}")
     lines.append(_TASK_TYPE_LABELS.get(task.task_type, str(task.task_type.value)))
     if task.deadline:
-        lines.append(f"🕐 Deadline: {task.deadline.strftime('%d-%m %H:%M')}")
+        lines.append(f"🕐 Deadline: {format_dt(task.deadline)}")
     return "\n".join(lines)
 
 
@@ -167,7 +168,7 @@ async def _build_task_revision_requested(db, payload: dict) -> str | None:
     if reason:
         lines.append(f"💬 Sabab: {reason}")
     if task.deadline:
-        lines.append(f"🕐 Yangi deadline: {task.deadline.strftime('%d-%m %H:%M')}")
+        lines.append(f"🕐 Yangi deadline: {format_dt(task.deadline)}")
     return "\n".join(lines)
 
 

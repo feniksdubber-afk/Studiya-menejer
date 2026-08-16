@@ -57,11 +57,20 @@ async def _cue_out(db: AsyncSession, cue: VoiceCue) -> VoiceCueOut:
         if actor_obj is not None:
             actor = VoiceCueActorBrief.model_validate(actor_obj)
 
-    out = VoiceCueOut.model_validate(cue)
-    out.screenshot_url = r2_storage.public_url(cue.screenshot_key)
-    out.character = character
-    out.actor = actor
-    return out
+    return VoiceCueOut(
+        id=cue.id,
+        episode_id=cue.episode_id,
+        timestamp_seconds=cue.timestamp_seconds,
+        screenshot_url=r2_storage.public_url(cue.screenshot_key),
+        character=character,
+        temp_label=cue.temp_label,
+        actor=actor,
+        director_note=cue.director_note,
+        status=cue.status,
+        order_index=cue.order_index,
+        created_by=cue.created_by,
+        created_at=cue.created_at,
+    )
 
 
 async def _validate_character_belongs_to_project(

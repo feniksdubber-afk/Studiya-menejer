@@ -41,9 +41,15 @@ def _project_out(project: Project, can_manage: bool) -> ProjectOut:
 
 
 def _episode_out(episode: Episode, project_id: uuid.UUID) -> EpisodeOut:
-    out = EpisodeOut.model_validate(episode)
-    out.project_id = project_id
-    return out
+    return EpisodeOut(
+        id=episode.id,
+        season_id=episode.season_id,
+        project_id=project_id,
+        title=episode.title,
+        order_index=episode.order_index,
+        status=episode.status,
+        created_at=episode.created_at,
+    )
 
 
 # ==================== PROJECTS ====================

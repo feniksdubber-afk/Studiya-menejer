@@ -24,8 +24,9 @@ export function CueTimeline({
           style={{ width: `${pct}%` }}
         />
       </div>
-      {/* Cue markerlari — progress chizig'i ustida */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 w-full">
+      {/* Cue markerlari — progress chizig'i ustida. z-10: shaffof seek-range
+          (pastda, z-0) ustidan bosilishi kerak, aks holda range uni to'sib qo'yadi. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1.5 w-full">
         {duration > 0 &&
           cues.map((cue) => {
             const left = Math.min(100, (cue.timestamp_seconds / duration) * 100);
@@ -50,7 +51,7 @@ export function CueTimeline({
         step={0.1}
         value={Math.min(currentTime, duration)}
         onChange={(e) => onSeek(Number(e.target.value))}
-        className="absolute inset-x-0 -top-2 h-6 w-full cursor-pointer opacity-0"
+        className="absolute inset-x-0 -top-2 z-0 h-6 w-full cursor-pointer opacity-0"
         aria-label="Videoni oldinga/orqaga surish"
       />
     </div>

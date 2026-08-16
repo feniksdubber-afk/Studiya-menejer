@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Theater } from "lucide-react";
 import type { Character, ProjectMember, VoiceCue, VoiceCueStatus } from "@/types";
+import { listEpisodeCues } from "@/api/voiceCues";
 import { VoiceCueCard } from "@/components/VoiceCueCard";
 import { EmptyState } from "@/components/EmptyState";
+import { QueryError } from "@/components/StatusScreens";
 
 type FilterTab = "all" | "mine" | VoiceCueStatus;
 
@@ -15,14 +18,18 @@ const TABS: { key: FilterTab; label: string }[] = [
 ];
 
 export function CueList({
-  cues,
+  episodeId,
+  allCuesCount,
   activeCueId,
   currentUserId,
   characters,
   members,
   onSelect,
 }: {
-  cues: VoiceCue[];
+  episodeId: string;
+  /** Filtrlanmagan umumiy cue soni — sarlavhada ko'rsatiladi (ota-komponentdagi
+   * to'liq ro'yxatdan, timeline markerlari uchun ishlatilgan). */
+  allCuesCount: number;
   activeCueId: string | null;
   currentUserId?: string;
   characters: Character[];
@@ -33,23 +40,43 @@ export function CueList({
   const [characterFilter, setCharacterFilter] = useState("");
   const [actorFilter, setActorFilter] = useState("");
 
-  const filtered = useMemo(() => {
-    let result = cues;
-    if (tab === "mine") result = result.filter((c) => c.created_by === currentUserId);
-    else if (tab !== "all") result = result.filter((c) => c.status === tab);
-    if (characterFilter) result = result.filter((c) => c.character?.id === characterFilter);
-    if (actorFilter) result = result.filter((c) => c.actor?.id === actorFilter);
-    return result;
-  }, [cues, tab, currentUserId, characterFilter, actorFilter]);
+  // VF5: filterlash backend orqali (100-200 cue bo'lgan bo'limlarda butun
+  // ro'yxatni frontendga tortib, keyin JS bilan filtrlash o'rniga — server
+  // darajasida query parametrlar bilan qisqartirilgan natija so'raladi.
+  const filteredQuery = useQuery({
+    queryKey: [
+      "episode-cues",
+      episodeId,
+      {
+        status: tab !== "all" && tab !== "mine" ? tab : undefined,
+        createdByMe: tab === "mine",
+        characterId: characterFilter || undefined,
+        actorId: actorFilter || undefined,
+      },
+    ],
+    queryFn: () =>
+      listEpisodeCues(episodeId, {
+        status: tab !== "all" && tab !== "mine" ? (tab as VoiceCueStatus) : undefined,
+        createdByMe: tab === "mine",
+        characterId: characterFilter || undefined,
+        actorId: actorFilter || undefined,
+      }),
+    enabled: !!episodeId,
+    placeholderData: (prev) => prev,
+  });
+
+  const filtered = (filteredQuery.data ?? [])
+    .slice()
+    .sort((a, b) => a.timestamp_seconds - b.timestamp_seconds);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Theater size={15} className="text-tg-text" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-tg-text">Rollar ({cues.length})</h2>
+        <h2 className="text-sm font-semibold text-tg-text">Rollar ({allCuesCount})</h2>
       </div>
 
-      <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-0.5">
+      <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-0.5 lg:mx-0 lg:px-0">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -94,10 +121,22 @@ export function CueList({
         </div>
       )}
 
-      {filtered.length === 0 ? (
+      {filteredQuery.isError ? (
+        <QueryError
+          message="Rollar ro'yxatini yuklab bo'lmadi."
+          onRetry={() => filteredQuery.refetch()}
+        />
+      ) : filteredQuery.isLoading ? (
+        <div className="flex flex-col gap-2">
+          <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+          <div className="h-16 animate-pulse rounded-2xl bg-tg-secondaryBg" />
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Theater} message="Bu filterda rol topilmadi." />
       ) : (
-        <div className="flex flex-col gap-2">
+        <div
+          className={`flex flex-col gap-2 ${filteredQuery.isFetching ? "opacity-60" : ""}`}
+        >
           {filtered.map((cue) => (
             <VoiceCueCard
               key={cue.id}

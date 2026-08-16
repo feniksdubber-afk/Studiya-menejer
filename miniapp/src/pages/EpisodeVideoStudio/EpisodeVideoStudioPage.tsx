@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
 import { UploadCloud, Theater, Trash2 } from "lucide-react";
-import { getEpisode } from "@/api/projects";
+import { getEpisode, getProject } from "@/api/projects";
 import { listCharacters } from "@/api/characters";
 import { listProjectMembers } from "@/api/projects";
 import {
@@ -63,6 +63,17 @@ export default function EpisodeVideoStudioPage() {
   });
 
   const projectId = episodeQuery.data?.project_id;
+
+  // Video allaqachon mavjud bo'lsa, faqat rejissyor/admin uni
+  // almashtira/o'chira oladi (backend §V1 qoidasi). Bu shart bo'lmasa
+  // tugmalar hammaga bir xil ko'rinadi-yu, oddiy a'zo bosganda 403 bilan
+  // uchraydi — buning o'rniga tugmani boshidanoq yashiramiz.
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => getProject(projectId!),
+    enabled: !!projectId,
+  });
+  const canManageVideo = projectQuery.data?.can_manage ?? false;
 
   const charactersQuery = useQuery({
     queryKey: ["project-characters", projectId],
@@ -332,14 +343,23 @@ export default function EpisodeVideoStudioPage() {
                   }}
                 />
               )}
-              <button
-                onClick={handleDeleteVideo}
-                disabled={deleteVideoMutation.isPending}
-                className="flex items-center justify-center gap-2 rounded-xl bg-tg-secondaryBg px-4 py-2.5 text-sm font-medium text-role-voice-600 disabled:opacity-50"
-              >
-                <Trash2 size={15} aria-hidden="true" />
-                {deleteVideoMutation.isPending ? "O'chirilmoqda..." : "Videoni o'chirish"}
-              </button>
+              {/* O'chirish huquqi kim yuklagan bo'lsa o'sha + rejissyor/admin
+                  (§V1). Frontendda kim yuklaganini bilmaymiz (owner_id
+                  hozircha OriginalVideo turida yo'q), shuning uchun bu
+                  yerda faqat rejissyor/admin uchun ko'rsatamiz — video
+                  yuklagan oddiy a'zo tugmani ko'rmasa ham, kerak bo'lsa
+                  rejissyordan so'rashi mumkin; noto'g'ri 403 ko'rsatishdan
+                  ko'ra shu yondashuv aniqroq. */}
+              {canManageVideo && (
+                <button
+                  onClick={handleDeleteVideo}
+                  disabled={deleteVideoMutation.isPending}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-tg-secondaryBg px-4 py-2.5 text-sm font-medium text-role-voice-600 disabled:opacity-50"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {deleteVideoMutation.isPending ? "O'chirilmoqda..." : "Videoni o'chirish"}
+                </button>
+              )}
             </>
           )}
         </div>

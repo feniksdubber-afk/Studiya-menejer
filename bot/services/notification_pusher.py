@@ -199,9 +199,22 @@ async def _build_task_delayed(db, payload: dict) -> str | None:
     return "\n".join(lines)
 
 
+async def _build_director_role_requested(db, payload: dict) -> str | None:
+    name = payload.get("applicant_name") or "Foydalanuvchi"
+    username = payload.get("applicant_username")
+    username_line = f"@{username}" if username else "(username yo'q)"
+    return (
+        "🎬 Yangi rejissyorlik so'rovi\n\n"
+        f"👤 {name}\n"
+        f"🔗 {username_line}\n\n"
+        "Ko'rib chiqish uchun /admin_pending buyrug'ini yuboring."
+    )
+
+
 _BUILDERS = {
     "task_assigned": _build_task_assigned,
     "task_submitted": _build_task_submitted,
     "task_revision_requested": _build_task_revision_requested,
     "task_delayed": _build_task_delayed,
+    "director_role_requested": _build_director_role_requested,
 }

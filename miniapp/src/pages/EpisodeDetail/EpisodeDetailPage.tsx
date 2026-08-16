@@ -68,17 +68,22 @@ export default function EpisodeDetailPage() {
     enabled: !!episode?.project_id && isFormOpen,
   });
 
+  // Personaj tanlash "voice" uchun majburiy, "sound_audio"/"sound_video"
+  // uchun esa ixtiyoriy (ko'p personajli qismlarda to'g'ri ish zanjiri —
+  // upstream-file to'g'ri filtrlanishi — uchun foydali).
+  const showCharacterField = taskType === "voice" || taskType === "sound_audio" || taskType === "sound_video";
+
   const { data: characters } = useQuery({
     queryKey: ["characters", episode?.project_id],
     queryFn: () => listCharacters(episode!.project_id),
-    enabled: !!episode?.project_id && isFormOpen && taskType === "voice",
+    enabled: !!episode?.project_id && isFormOpen && showCharacterField,
   });
 
   const { mutate: submitTask, isPending: isSubmitting } = useMutation({
     mutationFn: () =>
       createTask(episodeId!, {
         task_type: taskType,
-        character_id: taskType === "voice" ? characterId || null : null,
+        character_id: showCharacterField ? characterId || null : null,
         assigned_to: assignedTo,
         deadline: deadline ? new Date(deadline).toISOString() : null,
       }),
@@ -165,9 +170,14 @@ export default function EpisodeDetailPage() {
               onClick={() => navigate(`/tasks/${task.id}`)}
               className="flex items-center justify-between rounded-2xl bg-tg-secondaryBg p-4 text-left active:opacity-70"
             >
-              <span className="text-sm font-medium text-tg-text">
-                {TASK_TYPE_LABEL[task.task_type] ?? task.task_type}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-tg-text">
+                  {TASK_TYPE_LABEL[task.task_type] ?? task.task_type}
+                </span>
+                {task.character_name && (
+                  <span className="text-xs text-tg-hint">{task.character_name}</span>
+                )}
+              </div>
               <TaskStatusBadge status={task.status} />
             </button>
           ))
@@ -207,9 +217,11 @@ export default function EpisodeDetailPage() {
               </select>
             </div>
 
-            {taskType === "voice" && (
+            {showCharacterField && (
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-tg-hint">Personaj</span>
+                <span className="text-xs font-medium text-tg-hint">
+                  Personaj{taskType !== "voice" && " (ixtiyoriy)"}
+                </span>
                 <select
                   value={characterId}
                   onChange={(e) => setCharacterId(e.target.value)}

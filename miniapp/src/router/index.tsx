@@ -5,6 +5,8 @@ import MyTasksPage from "@/pages/MyTasks/MyTasksPage";
 import ProjectsPage from "@/pages/Projects/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetail/ProjectDetailPage";
 import EpisodeDetailPage from "@/pages/EpisodeDetail/EpisodeDetailPage";
+import EpisodeVideoStudioPage from "@/pages/EpisodeVideoStudio/EpisodeVideoStudioPage";
+import ActorWorkspacePage from "@/pages/ActorWorkspace/VoiceCuePlayer";
 import CharacterDetailPage from "@/pages/CharacterDetail/CharacterDetailPage";
 import TaskDetailPage from "@/pages/TaskDetail/TaskDetailPage";
 import ProfilePage from "@/pages/Profile/ProfilePage";
@@ -23,6 +25,8 @@ export const router = createBrowserRouter([
       { path: "/projects", element: <ProjectsPage /> },
       { path: "/projects/:projectId", element: <ProjectDetailPage /> },
       { path: "/episodes/:episodeId", element: <EpisodeDetailPage /> },
+      { path: "/episodes/:episodeId/studio", element: <EpisodeVideoStudioPage /> },
+      { path: "/episodes/:episodeId/voice-cues/mine", element: <ActorWorkspacePage /> },
       { path: "/characters/:characterId", element: <CharacterDetailPage /> },
       { path: "/profile", element: <ProfilePage /> },
       { path: "/notifications", element: <NotificationsPage /> },

@@ -5,6 +5,7 @@ from .characters import Character, CharacterCast, ImageSource, CastType
 from .tasks import Task, DeadlineHistory, TaskType, TaskStatus
 from .files import Folder, File, FileVersion, FileKind, VersionStatus
 from .activity import Notification, Comment, Mention, ActivityLog
+from .voice_cues import VoiceCue, VoiceCueStatus
 
 __all__ = [
     "Base",
@@ -14,4 +15,5 @@ __all__ = [
     "Task", "DeadlineHistory", "TaskType", "TaskStatus",
     "Folder", "File", "FileVersion", "FileKind", "VersionStatus",
     "Notification", "Comment", "Mention", "ActivityLog",
+    "VoiceCue", "VoiceCueStatus",
 ]

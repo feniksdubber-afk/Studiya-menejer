@@ -10,6 +10,7 @@ export interface CharacterCreatePayload {
   name: string;
   anilist_original_name?: string | null;
   anilist_image_url?: string | null;
+  anilist_role?: string | null;
 }
 
 export async function createCharacter(

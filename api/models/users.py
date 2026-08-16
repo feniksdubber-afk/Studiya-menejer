@@ -29,6 +29,7 @@ class User(Base, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(128), nullable=False)
     last_name: Mapped[str | None] = mapped_column(String(128))
     telegram_username: Mapped[str | None] = mapped_column(String(128))
+    phone_number: Mapped[str | None] = mapped_column(String(20))
 
     # NULL = Telegram orqali auth qilingan, lekin ro'yxatdan hali to'liq
     # o'tmagan (rol/ism bot FSM orqali keyingi bosqichda to'ldiriladi).

@@ -106,7 +106,7 @@ async def _notify_one(db, bot: Bot, task: Task) -> None:
         # Telegram xabari yuqorida shu funksiya ichida darhol yuborildi,
         # shuning uchun umumiy push navbatchisi (notification_pusher.py)
         # buni qayta yubormasligi uchun darhol "pushed" deb belgilanadi.
-        pushed_at=now,
+        pushed_at=datetime.now(timezone.utc),
     )
     db.add(notification)
 

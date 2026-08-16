@@ -18,7 +18,7 @@ import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { useDebouncedUserSearch } from "@/hooks/useDebouncedUserSearch";
 import { useToast } from "@/components/Toast";
 import { Drama, Image, X, Mic2, Star } from "lucide-react";
-import type { CastType, CharacterCast, User } from "@/types";
+import type { CastType, CharacterCast, UserSearchResult } from "@/types";
 
 // MUHIM: bu qiymat backend'dagi core/config.py:character_image_max_bytes
 // (5 MB) bilan bir xil bo'lishi shart. Mos kelmasa, foydalanuvchi frontend
@@ -43,7 +43,7 @@ function AddActorForm({ characterId }: { characterId: string }) {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [castType, setCastType] = useState<CastType>("main");
   const {
     query,

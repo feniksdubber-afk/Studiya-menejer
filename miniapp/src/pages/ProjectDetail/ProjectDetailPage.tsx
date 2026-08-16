@@ -63,6 +63,33 @@ const ROLE_OPTIONS: { value: ProjectRole; label: string }[] = (
   Object.keys(ROLE_META) as ProjectRole[]
 ).map((value) => ({ value, label: ROLE_META[value].label }));
 
+// AniList "role" maydoni (MAIN/SUPPORTING/BACKGROUND) uchun o'zbekcha
+// yorliq. Notanish/kelmagan qiymat bo'lsa hech narsa ko'rsatilmaydi.
+const ANILIST_ROLE_LABEL: Record<string, string> = {
+  MAIN: "Bosh personaj",
+  SUPPORTING: "Ikkinchi darajali",
+  BACKGROUND: "Fon personaji",
+};
+
+const ANILIST_ROLE_BADGE_CLASS: Record<string, string> = {
+  MAIN: "bg-role-director-50 text-role-director-800 dark:bg-role-director-900/50 dark:text-role-director-400",
+  SUPPORTING: "bg-role-translator-50 text-role-translator-800 dark:bg-role-translator-900/50 dark:text-role-translator-400",
+  BACKGROUND: "bg-tg-bg text-tg-hint",
+};
+
+function AniListRoleBadge({ role }: { role: string | null | undefined }) {
+  const key = (role ?? "").toUpperCase();
+  const label = ANILIST_ROLE_LABEL[key];
+  if (!label) return null;
+  return (
+    <span
+      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-none ${ANILIST_ROLE_BADGE_CLASS[key]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function EpisodeRow({
   episode,
   canManage,
@@ -799,6 +826,87 @@ function ProjectHeader({
   );
 }
 
+function AddCharacterForm({ projectId }: { projectId: string }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { showError } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
+  const [name, setName] = useState("");
+
+  const { mutate: submit, isPending } = useMutation({
+    mutationFn: () => createCharacter(projectId, { name: name.trim() }),
+    onSuccess: (character) => {
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
+      setName("");
+      setIsOpen(false);
+      // Rasm yuklash uchun to'g'ridan-to'g'ri personaj sahifasiga o'tkazamiz
+      // — chunki rasm yuklash endpoint'i mavjud personaj ID'sini talab
+      // qiladi, shuning uchun yaratish formasida rasmni birga olib
+      // bo'lmaydi.
+      navigate(`/characters/${character.id}`);
+    },
+    onError: () => {
+      WebApp.HapticFeedback.notificationOccurred("error");
+      showError("Personajni qo'shib bo'lmadi.");
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    submit();
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="self-start rounded-xl bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-buttonText"
+      >
+        + Qo'lda personaj qo'shish
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-2xl bg-tg-secondaryBg p-3">
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-tg-hint">Personaj ismi</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          placeholder="Masalan: Naruto Uzumaki"
+          maxLength={256}
+          className="rounded-xl bg-tg-bg px-3 py-2 text-sm text-tg-text outline-none"
+        />
+      </label>
+      <p className="text-xs text-tg-hint">
+        Rasmni personaj yaratilgandan keyin, uning sahifasida yuklaysiz.
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={!name.trim() || isPending}
+          className="flex-1 rounded-xl bg-tg-button py-2 text-sm font-medium text-tg-buttonText disabled:opacity-60"
+        >
+          {isPending ? "Qo'shilmoqda..." : "Qo'shish"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(false);
+            setName("");
+          }}
+          className="rounded-xl px-3 py-2 text-sm text-tg-hint active:bg-tg-bg"
+        >
+          Bekor qilish
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -902,6 +1010,7 @@ export default function ProjectDetailPage() {
           name: c.name,
           anilist_original_name: c.native_name,
           anilist_image_url: c.image_url,
+          anilist_role: c.role,
         });
       }
     },
@@ -1007,6 +1116,8 @@ export default function ProjectDetailPage() {
 
       {tab === "characters" && (
         <div className="flex flex-col gap-3">
+          {canManage && projectId && <AddCharacterForm projectId={projectId} />}
+
           {canManage && project?.anilist_id && (
             <button
               onClick={() => setIsImportOpen((open) => !open)}
@@ -1075,6 +1186,7 @@ export default function ProjectDetailPage() {
                         )}
                       </div>
                       <span className="line-clamp-1 text-xs text-tg-text">{c.name}</span>
+                      <AniListRoleBadge role={c.role} />
                       {alreadyAdded && <span className="text-[10px] text-tg-hint">qo'shilgan</span>}
                     </button>
                   );
@@ -1114,6 +1226,7 @@ export default function ProjectDetailPage() {
                     )}
                   </div>
                   <span className="line-clamp-1 text-xs text-tg-text">{c.name}</span>
+                  <AniListRoleBadge role={c.anilist_role} />
                 </button>
               ))
             ) : (

@@ -28,6 +28,17 @@ export async function getTask(taskId: string): Promise<Task> {
   return data;
 }
 
+export interface TaskUpdatePayload {
+  assigned_to?: string;
+  character_id?: string | null;
+  deadline?: string | null;
+}
+
+export async function updateTask(taskId: string, payload: TaskUpdatePayload): Promise<Task> {
+  const { data } = await apiClient.patch<Task>(`/tasks/${taskId}`, payload);
+  return data;
+}
+
 export async function setTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
   const { data } = await apiClient.post<Task>(`/tasks/${taskId}/status`, { status });
   return data;

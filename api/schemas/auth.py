@@ -38,6 +38,21 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserSearchResult(BaseModel):
+    """`/users/search` (jamoaga a'zo qo'shishda foydalanuvchi tanlash) uchun
+    qisqartirilgan profil. `UserOut`dan farqli — bu istalgan ro'yxatdan
+    o'tgan foydalanuvchiga ochiq bo'lgani uchun telefon raqami, Telegram ID
+    va admin bayroqlari kabi shaxsiy/imtiyozli maydonlarni QAYTARMAYDI."""
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str | None
+    telegram_username: str | None
+    role: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class RoleUpdateRequest(BaseModel):
     """Ro'yxatdan o'tgan foydalanuvchi o'z umumiy rolini o'zi almashtirishi
     uchun (Profil sahifasi). Rejissyorlikka o'tish admin tasdig'ini talab

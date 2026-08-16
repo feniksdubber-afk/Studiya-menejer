@@ -116,35 +116,60 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_registered_user),
 ):
-    query = select(Project)
-    if not include_archived:
-        query = query.where(Project.is_archived.is_(False))
-    query = query.order_by(Project.created_at.desc())
-    result = await db.execute(query)
-    projects = list(result.scalars().all())
+    """Faqat foydalanuvchi a'zo bo'lgan loyihalar qaytariladi (admin/super_admin
+    bundan mustasno — ular barchasini ko'radi).
 
+    MUHIM: bu yerda a'zolik tekshiruvi shart, chunki ro'yxatdan o'tishning
+    o'zi loyiha ma'lumotlariga kirish huquqi bermaydi — bot orqali ro'yxatdan
+    o'tgan istalgan begona odam (tarjimon/ovoz aktyori/svedeniyachi rollari
+    admin tasdig'isiz darhol faollashadi) aks holda barcha studiya
+    loyihalarining nomi/posterini ko'rgan bo'lardi.
+    """
     if user.is_admin or user.is_super_admin:
-        director_project_ids: set[uuid.UUID] = {p.id for p in projects}
+        query = select(Project)
+        if not include_archived:
+            query = query.where(Project.is_archived.is_(False))
+        query = query.order_by(Project.created_at.desc())
+        result = await db.execute(query)
+        projects = list(result.scalars().all())
+        director_project_ids = {p.id for p in projects}
     else:
         member_result = await db.execute(
-            select(ProjectMember.project_id).where(
+            select(ProjectMember.project_id, ProjectMember.role_in_project).where(
                 ProjectMember.user_id == user.id,
-                ProjectMember.role_in_project.in_([ProjectRole.director_main, ProjectRole.director_extra]),
             )
         )
-        director_project_ids = {row[0] for row in member_result.all()}
+        memberships = member_result.all()
+        member_project_ids = {row[0] for row in memberships}
+        director_project_ids = {
+            row[0] for row in memberships
+            if row[1] in (ProjectRole.director_main, ProjectRole.director_extra)
+        }
+
+        if not member_project_ids:
+            return []
+
+        query = select(Project).where(Project.id.in_(member_project_ids))
+        if not include_archived:
+            query = query.where(Project.is_archived.is_(False))
+        query = query.order_by(Project.created_at.desc())
+        result = await db.execute(query)
+        projects = list(result.scalars().all())
 
     return [_project_out(p, can_manage=p.id in director_project_ids) for p in projects]
 
 
 @router.get("/projects/{project_id}", response_model=ProjectOut)
 async def get_project(
-    project_id: uuid.UUID,
+    project_and_user: tuple[Project, User] = Depends(project_view_access),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_registered_user),
 ):
-    project = await get_project_or_404(project_id, db)
-    can_manage = await is_project_director(db, project_id, user)
+    """`project_view_access` orqali a'zolik (yoki admin) tekshiriladi —
+    boshqa barcha `/projects/{project_id}/...` endpointlar bilan bir xil
+    qoida (avval bu yerda tekshiruv yo'q edi, faqat pastroqdagi
+    seasons/episodes'da bor edi — nomuvofiqlik tuzatildi)."""
+    project, user = project_and_user
+    can_manage = await is_project_director(db, project.id, user)
     return _project_out(project, can_manage=can_manage)
 
 

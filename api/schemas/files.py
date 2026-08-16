@@ -53,3 +53,39 @@ class FileSubmitResult(BaseModel):
     version: FileVersionOut
     task_status: str
     task_current_version: int
+
+
+# ==================== ORIGINAL VIDEO (V1: R2 presigned upload) ====================
+
+class OriginalVideoUploadUrlRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=512)
+    mime_type: str = Field(min_length=1, max_length=128)
+
+
+class OriginalVideoUploadUrlOut(BaseModel):
+    upload_url: str
+    r2_key: str
+    expires_in: int
+
+
+class OriginalVideoConfirm(BaseModel):
+    r2_key: str = Field(min_length=1, max_length=512)
+    file_name: str = Field(min_length=1, max_length=512)
+    mime_type: str = Field(min_length=1, max_length=128)
+
+
+class OriginalVideoOut(BaseModel):
+    id: uuid.UUID
+    episode_id: uuid.UUID | None
+    current_name: str
+    mime_type: str | None
+    file_size: int | None
+    owner_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class OriginalVideoPlaybackOut(BaseModel):
+    video_url: str
+    expires_in: int

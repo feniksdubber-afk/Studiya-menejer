@@ -15,26 +15,28 @@
 | # | Bosqich | Holat |
 |---|---|---|
 | V1 | Video uchun R2 storage qatlami (model+presigned upload) | ✅ bajarildi |
-| VF1 | Video Studio — video player + timeline (asosiy ekran) | ❌ boshlanmagan |
-| VF2 | Cue Capture — 📸 kadr olish, tezkor/batafsil rejim | ❌ boshlanmagan |
-| VF3 | Cue Editor — forma (yaratish/tahrirlash/duplicate) | ❌ boshlanmagan |
-| VF4 | Cue Timeline — video ustidagi markerlar | ❌ boshlanmagan |
-| VF5 | Cue List — filter (personaj/aktyor/status) | ❌ boshlanmagan |
-| VF6 | Actor Workspace — aktyor uchun alohida player | ❌ boshlanmagan |
-| VF7 | UX holatlari (loading/empty/error/upload) | ❌ boshlanmagan |
+| VF1 | Video Studio — video player + timeline (asosiy ekran) | ✅ bajarildi |
+| VF2 | Cue Capture — 📸 kadr olish, tezkor/batafsil rejim | ✅ bajarildi |
+| VF3 | Cue Editor — forma (yaratish/tahrirlash/duplicate) | ✅ bajarildi (Duplicate — joriy video freymidan, personaj/aktyor/izoh nusxalanadi) |
+| VF4 | Cue Timeline — video ustidagi markerlar | ✅ bajarildi |
+| VF5 | Cue List — filter (personaj/aktyor/status) | ✅ bajarildi (Barchasi/Mening/status tab + personaj/aktyor dropdown) |
+| VF6 | Actor Workspace — aktyor uchun alohida player | ✅ bajarildi (`ActorWorkspace/VoiceCuePlayer.tsx`, `/episodes/:id/voice-cues/mine`, `TaskDetailPage`dan "Ovoz berish" tugmasi ulandi) |
+| VF7 | UX holatlari (loading/empty/error/upload) | ✅ asosiylari bajarildi |
 | 1 | `api/models/voice_cues.py` | ✅ bajarildi |
 | 2 | Alembic migratsiya `0007_voice_cues.py` | ✅ bajarildi |
 | 3 | `api/schemas/voice_cues.py` | ✅ bajarildi |
 | 4 | `api/services/r2_storage.py` — prefix parametri | ✅ bajarildi |
-| 5 | `api/routers/voice_cues.py` | ✅ bajarildi |
+| 5 | `api/routers/voice_cues.py` | ✅ bajarildi (Duplicate endpointi bilan) |
 | 6 | `api/main.py` — router ulash | ✅ bajarildi |
 | 7 | `api/models/__init__.py` — export | ✅ bajarildi |
 | 8 | `api/schemas/projects.py` — `EpisodeOut.project_id` | ✅ bajarildi |
-| 9 | `miniapp/src/types/index.ts` — VoiceCue turlari | ❌ boshlanmagan |
-| 10 | `miniapp/src/api/voiceCues.ts` | ❌ boshlanmagan |
-| 11-14 | Frontend komponentlar — pastdagi VF1-VF7 bo'limlariga qarang (eski oddiy reja almashtirildi) | ❌ boshlanmagan |
-| 15 | `npm run build` tekshiruvi | ❌ boshlanmagan |
-| 16 | O'zgargan fayllarni zip qilish + DEPLOY qo'shimchasi | ❌ boshlanmagan |
+| 9 | `miniapp/src/types/index.ts` — VoiceCue turlari | ✅ bajarildi |
+| 10 | `miniapp/src/api/voiceCues.ts` | ✅ bajarildi (+ `api/originalVideo.ts`) |
+| 11-14 | Frontend komponentlar — pastdagi VF1-VF7 bo'limlariga qarang (eski oddiy reja almashtirildi) | ✅ bajarildi (VF1/VF2/VF4 to'liq, VF3/VF5 qisman) |
+| 15 | `npm run build` tekshiruvi | ✅ xatosiz o'tdi |
+| 16 | O'zgargan fayllarni zip qilish + DEPLOY qo'shimchasi | ✅ shu sessiyada |
+
+**Keyingi sessiya uchun eng muhim qolganlar:** VF7'ning qolgan mayda holatlari (tarmoq uzilishi/qayta urinish videoda), desktop ikki ustunli layout, video CORS sozlamasini serverda tekshirish (real R2 bucket'da). Asosiy funksional — director tomon (Video Studio) va aktyor tomon (Actor Workspace) — to'liq ishlaydi.
 
 **Qoida:** har bir bosqich yozib bo'lingach, shu jadvaldagi holatni ✅ ga
 o'zgartirib qo'yish kerak (fayl tahrirlanadi), shunda progress hech qachon

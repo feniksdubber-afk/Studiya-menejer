@@ -95,6 +95,9 @@ export default function MyTasksPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-tg-text">
                         {TASK_TYPE_LABEL[task.task_type]}
+                        {task.character_name && (
+                          <span className="ml-1.5 font-normal text-tg-hint">— {task.character_name}</span>
+                        )}
                       </span>
                       <TaskStatusBadge status={task.status} />
                     </div>

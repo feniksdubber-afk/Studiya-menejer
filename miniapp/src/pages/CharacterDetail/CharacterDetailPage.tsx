@@ -30,6 +30,15 @@ const CAST_TYPE_META: Record<CastType, { label: string; badgeClass: string; icon
   alternate: { label: "Muqobil", badgeClass: "bg-tg-bg text-tg-hint", icon: null },
 };
 
+// AniList'dan import qilingan personajning ahamiyat darajasi
+// (bosh/ikkinchi darajali/fon). Qo'lda qo'shilgan personajlarda bu
+// maydon bo'sh bo'ladi va badge umuman ko'rsatilmaydi.
+const ANILIST_ROLE_META: Record<string, { label: string; badgeClass: string }> = {
+  main: { label: "Bosh personaj", badgeClass: "bg-role-director-50 text-role-director-800 dark:bg-role-director-900/50 dark:text-role-director-400" },
+  supporting: { label: "Ikkinchi darajali", badgeClass: "bg-role-translator-50 text-role-translator-800 dark:bg-role-translator-900/50 dark:text-role-translator-400" },
+  background: { label: "Fon personaji", badgeClass: "bg-white/20 text-white" },
+};
+
 function AddActorForm({ characterId }: { characterId: string }) {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
@@ -329,6 +338,13 @@ export default function CharacterDetailPage() {
           <h1 className="text-xl font-semibold text-white drop-shadow">{character.name}</h1>
           {character.anilist_original_name && character.anilist_original_name !== character.name && (
             <p className="text-sm text-white/80 drop-shadow">{character.anilist_original_name}</p>
+          )}
+          {character.anilist_role && ANILIST_ROLE_META[character.anilist_role] && (
+            <span
+              className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm ${ANILIST_ROLE_META[character.anilist_role].badgeClass}`}
+            >
+              {ANILIST_ROLE_META[character.anilist_role].label}
+            </span>
           )}
         </div>
         {canManage && (

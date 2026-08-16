@@ -1,6 +1,6 @@
-"""Cloudflare R2 — FAQAT personaj rasmlari uchun (arxitektura hujjati §0, §6.1).
-Video/audio/boshqa fayllar hech qachon bu yerga tushmaydi — ular uchun
-Telegram file_id ishlatiladi (services/file_service.py).
+"""Cloudflare R2 — personaj rasmlari (WebP) va V1'dan boshlab original video
+(dub-videos/) uchun. Boshqa fayllar (translation/voice/sound_*) hamon
+Telegram file_id orqali saqlanadi (services/file_service.py).
 """
 import uuid
 
@@ -73,3 +73,48 @@ def public_url(key: str) -> str | None:
     if not base:
         return None
     return f"{base}/{key}"
+
+
+# ==================== VIDEO (V1: presigned upload/playback) ====================
+# Personaj rasmlaridan farqli o'laroq video ochiq (public) URL orqali emas,
+# har doim VAQTINCHALIK imzolangan havola orqali ko'rsatiladi — bucket'da
+# original video ommaviy o'qishga ochiq emas (§V1).
+
+def build_video_object_key(original_filename: str) -> str:
+    """dub-videos/<uuid>.<ext> — kengaytma original nomdan olinadi (frontend
+    <video> content-type'ni to'g'ri aniqlashi uchun), lekin fayl nomining
+    o'zi hech qachon kalitga qo'shilmaydi (xavfsizlik/keshlash)."""
+    ext = ""
+    if "." in original_filename:
+        ext = "." + original_filename.rsplit(".", 1)[-1].lower()[:10]
+    return f"dub-videos/{uuid.uuid4()}{ext}"
+
+
+def generate_presigned_upload_url(key: str, content_type: str, expires_in: int) -> str:
+    """Brauzer shu URL'ga to'g'ridan-to'g'ri PUT qiladi — katta video API
+    serveri orqali proksi qilinmaydi (§V1: xavfsiz va tez emas)."""
+    return _client().generate_presigned_url(
+        "put_object",
+        Params={"Bucket": settings.r2_bucket_name, "Key": key, "ContentType": content_type},
+        ExpiresIn=expires_in,
+    )
+
+
+def generate_presigned_download_url(key: str, expires_in: int) -> str:
+    """`GET /episodes/{id}/original-video` shu havolani qaytaradi, frontend
+    to'g'ridan-to'g'ri `<video src=...>`ga beradi."""
+    return _client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.r2_bucket_name, "Key": key},
+        ExpiresIn=expires_in,
+    )
+
+
+def get_object_size(key: str) -> int | None:
+    """Haqiqiy fayl hajmini R2'dan so'rab tasdiqlaydi — `confirm`
+    endpointida faqat frontend tekshiruviga ishonib bo'lmaydi (§V1)."""
+    try:
+        head = _client().head_object(Bucket=settings.r2_bucket_name, Key=key)
+        return head.get("ContentLength")
+    except ClientError:
+        return None

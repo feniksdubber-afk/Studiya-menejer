@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from models.characters import CastType, ImageSource
+from models.characters import AniListCharacterRole, CastType, ImageSource
 from schemas.auth import UserBrief
 
 
@@ -11,6 +11,7 @@ class CharacterCreate(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     anilist_original_name: str | None = None
     anilist_image_url: str | None = None  # AniList'dan import qilinganda
+    anilist_role: str | None = None  # AniList: MAIN / SUPPORTING / BACKGROUND
 
 
 class CharacterUpdate(BaseModel):
@@ -25,6 +26,7 @@ class CharacterOut(BaseModel):
     name: str
     anilist_original_name: str | None
     anilist_image_url: str | None
+    anilist_role: AniListCharacterRole | None
     custom_image_key: str | None
     image_source: ImageSource
     is_active: bool

@@ -35,13 +35,22 @@ class Folder(Base, TimestampMixin):
 
 
 class File(Base, TimestampMixin):
-    """Faqat Telegram file_id + metadata. Binary hech qachon serverga tushmaydi."""
+    """Odatda faqat Telegram file_id + metadata (binary serverga tushmaydi).
+
+    Istisno: `file_kind=original_video`. Bu turdagi fayllar brauzerdan
+    to'g'ridan-to'g'ri R2'ga (presigned PUT orqali) yuklanadi — Telegram bot
+    bu oqimda umuman ishtirok etmaydi, shuning uchun bunday yozuvlarda
+    `telegram_file_id`/`telegram_message_id` NULL bo'ladi, `r2_key` esa
+    to'ldiriladi (VOICE-CUES-PLAN.md — V1 bosqichi).
+    """
 
     __tablename__ = "files"
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    telegram_file_id: Mapped[str] = mapped_column(String(512), nullable=False)
-    telegram_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    telegram_file_id: Mapped[str | None] = mapped_column(String(512))
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    # Faqat file_kind=original_video uchun to'ldiriladi: dub-videos/<uuid>.<ext>
+    r2_key: Mapped[str | None] = mapped_column(String(512))
     original_name: Mapped[str] = mapped_column(String(512), nullable=False)
     current_name: Mapped[str] = mapped_column(String(512), nullable=False)
     mime_type: Mapped[str | None] = mapped_column(String(128))

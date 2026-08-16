@@ -17,6 +17,18 @@ export interface User {
   is_super_admin: boolean;
 }
 
+// `/users/search` javobi — backend shaxsiy/imtiyozli maydonlarni
+// (phone_number, telegram_id, is_admin va h.k.) qaytarmaydi, chunki bu
+// endpoint istalgan ro'yxatdan o'tgan foydalanuvchiga ochiq (jamoaga
+// a'zo qo'shishda ishlatiladi — qarang: api/schemas/auth.py:UserSearchResult).
+export interface UserSearchResult {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  telegram_username: string | null;
+  role: UserRole | null;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: string;

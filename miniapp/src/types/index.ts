@@ -222,3 +222,23 @@ export interface OriginalVideoPlayback {
   video_url: string;
   expires_in: number;
 }
+
+// ==================== TASK / UPSTREAM FILE (Telegram getFile orqali) ====================
+// Tarjimon/ovoz aktyori/svedeniyachi ish oqimida: joriy vazifaning topshirilgan
+// fayli yoki oldingi bosqichning natijasi (masalan ovoz -> audio montaj uchun).
+
+export type FileKind = "original_video" | "translation" | "voice" | "sound_video" | "sound_audio" | "other";
+
+export interface TaskFile {
+  file_id: string;
+  task_id: string | null;
+  file_kind: FileKind;
+  current_name: string;
+  mime_type: string | null;
+  file_size: number | null;
+  version_number: number;
+  uploaded_by: string;
+  created_at: string;
+  file_url: string;
+  expires_in: number;
+}

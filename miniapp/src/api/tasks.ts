@@ -1,5 +1,17 @@
 import { apiClient } from "./client";
-import type { DeadlineHistory, Task, TaskStatus } from "@/types";
+import type { DeadlineHistory, Task, TaskStatus, TaskType } from "@/types";
+
+export interface TaskCreatePayload {
+  task_type: TaskType;
+  character_id?: string | null;
+  assigned_to: string;
+  deadline?: string | null;
+}
+
+export async function createTask(episodeId: string, payload: TaskCreatePayload): Promise<Task> {
+  const { data } = await apiClient.post<Task>(`/episodes/${episodeId}/tasks`, payload);
+  return data;
+}
 
 export async function listMyTasks(): Promise<Task[]> {
   const { data } = await apiClient.get<Task[]>("/tasks/mine");

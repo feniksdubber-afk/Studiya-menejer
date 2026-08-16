@@ -27,6 +27,7 @@ const TYPE_META: Record<string, { label: string; icon: LucideIcon }> = {
   task_revision_requested: { label: "Qayta ishlashga qaytarildi", icon: RotateCcw },
   task_delayed: { label: "Deadline o'tib ketdi", icon: AlertTriangle },
   deadline_soon: { label: "Deadline yaqinlashmoqda", icon: Clock3 },
+  voice_cue_assigned: { label: "Sizga yangi rol biriktirildi", icon: ClipboardCheck },
 };
 
 function metaFor(type: NotificationType) {
@@ -50,6 +51,10 @@ function timeAgo(iso: string): string {
 function targetPath(n: Notification): string | null {
   const taskId = n.payload?.["task_id"];
   if (typeof taskId === "string") return `/tasks/${taskId}`;
+  if (n.type === "voice_cue_assigned") {
+    const episodeId = n.payload?.["episode_id"];
+    if (typeof episodeId === "string") return `/episodes/${episodeId}/voice-cues/mine`;
+  }
   return null;
 }
 

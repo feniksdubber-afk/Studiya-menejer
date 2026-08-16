@@ -89,3 +89,28 @@ class OriginalVideoOut(BaseModel):
 class OriginalVideoPlaybackOut(BaseModel):
     video_url: str
     expires_in: int
+
+
+# ==================== TASK/UPSTREAM FILE PLAYBACK (Telegram getFile orqali) ====================
+# Tarjimon/ovoz aktyori/svedeniyachi ish oqimida oldingi bosqich natijasini
+# (masalan tarjimon uchun original video, svedeniyachi uchun ovoz fayli)
+# yoki joriy vazifaning o'zi topshirgan faylini Mini App ichida to'g'ridan-
+# to'g'ri ko'rish/eshitish/yuklab olish uchun. Binary hech qachon bizning
+# serverimizda saqlanmaydi — Telegram Bot API `getFile` orqali vaqtinchalik
+# (bir necha soatlik) havola olinadi va shundayligicha frontendga beriladi.
+
+
+class TaskFileOut(BaseModel):
+    file_id: uuid.UUID
+    task_id: uuid.UUID | None
+    file_kind: FileKind
+    current_name: str
+    mime_type: str | None
+    file_size: int | None
+    version_number: int
+    uploaded_by: uuid.UUID
+    created_at: datetime
+    # Telegram fayl havolasi — 1 soatgacha amal qiladi (Telegram serverida
+    # shu muddatdan keyin file_path eskiradi, qayta so'rash kerak bo'ladi).
+    file_url: str
+    expires_in: int

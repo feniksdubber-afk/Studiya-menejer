@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
-import type { User, UserRole } from "@/types";
+import type { User, UserRole, UserSearchResult } from "@/types";
 
-export async function searchUsers(query: string): Promise<User[]> {
-  const { data } = await apiClient.get<User[]>("/users/search", { params: { q: query } });
+export async function searchUsers(query: string): Promise<UserSearchResult[]> {
+  const { data } = await apiClient.get<UserSearchResult[]>("/users/search", { params: { q: query } });
   return data;
 }
 

@@ -6,7 +6,7 @@ import { TaskStatusBadge, EpisodeStatusBadge } from "@/components/TaskStatusBadg
 import { QueryError, LoadingScreen } from "@/components/StatusScreens";
 import { EmptyState } from "@/components/EmptyState";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
-import { Film, ClipboardList } from "lucide-react";
+import { Film, ClipboardList, Theater } from "lucide-react";
 
 const TASK_TYPE_LABEL: Record<string, string> = {
   translation: "Tarjima",
@@ -62,6 +62,18 @@ export default function EpisodeDetailPage() {
         </h1>
         {episode && <EpisodeStatusBadge status={episode.status} />}
       </div>
+
+      {episode && (
+        <button
+          onClick={() => navigate(`/episodes/${episode.id}/studio`)}
+          className="flex items-center justify-between rounded-2xl bg-role-director-50 p-4 text-left active:opacity-70"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-role-director-800">
+            <Theater size={17} aria-hidden="true" /> Rollar (Video Studio)
+          </span>
+          <span className="text-role-director-600">→</span>
+        </button>
+      )}
 
       <div className="flex flex-col gap-2">
         {isTasksError ? (

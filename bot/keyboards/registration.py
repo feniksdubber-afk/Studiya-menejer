@@ -1,4 +1,10 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 
 ROLE_LABELS = {
     "director": "🎬 Rejissyor",
@@ -14,6 +20,22 @@ def role_selection_keyboard() -> InlineKeyboardMarkup:
         for key, label in ROLE_LABELS.items()
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def contact_request_keyboard() -> ReplyKeyboardMarkup:
+    """Foydalanuvchidan faqat Telegram'ning o'z tugmasi orqali (qo'lda
+    yozdirmasdan) raqam so'raydi — bu format xatosi va soxta raqam
+    kiritish ehtimolini butunlay yo'q qiladi, chunki Telegram bu holatda
+    aynan shu akkauntga bog'langan raqamni yuboradi."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📱 Raqamni ulashish", request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def remove_keyboard() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()
 
 
 def director_approval_keyboard(user_id: str) -> InlineKeyboardMarkup:

@@ -470,7 +470,7 @@ function AddMemberForm({ projectId }: { projectId: string }) {
   const { mutate: submit, isPending, error, reset: resetMutation } = useMutation({
     mutationFn: () => addProjectMember(projectId, selectedUser!.id, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-members", projectId] });
       WebApp.HapticFeedback.notificationOccurred("success");
       showSuccess("Jamoaga qo'shildi.");
       resetForm();
@@ -948,7 +948,7 @@ export default function ProjectDetailPage() {
   });
 
   const { data: members, isLoading: isMembersLoading } = useQuery({
-    queryKey: ["members", projectId],
+    queryKey: ["project-members", projectId],
     queryFn: () => listProjectMembers(projectId!),
     enabled: !!projectId && tab === "team",
   });
@@ -963,16 +963,16 @@ export default function ProjectDetailPage() {
     // Optimistik yangilanish: a'zoni ro'yxatdan darhol olib tashlaymiz,
     // server javobini kutib turmasdan — xato bo'lsa oldingi holatga qaytaramiz.
     onMutate: async ({ memberId }) => {
-      await queryClient.cancelQueries({ queryKey: ["members", projectId] });
-      const previous = queryClient.getQueryData<ProjectMember[]>(["members", projectId]);
-      queryClient.setQueryData<ProjectMember[]>(["members", projectId], (old) =>
+      await queryClient.cancelQueries({ queryKey: ["project-members", projectId] });
+      const previous = queryClient.getQueryData<ProjectMember[]>(["project-members", projectId]);
+      queryClient.setQueryData<ProjectMember[]>(["project-members", projectId], (old) =>
         old?.filter((m) => m.id !== memberId)
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(["members", projectId], context.previous);
+        queryClient.setQueryData(["project-members", projectId], context.previous);
       }
       showError("A'zoni olib tashlab bo'lmadi.");
     },
@@ -980,7 +980,7 @@ export default function ProjectDetailPage() {
       showSuccess("A'zo jamoadan olib tashlandi.");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["members", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-members", projectId] });
     },
   });
   // MUHIM: `isPending` bilan birga tekshirilmasa, mutatsiya xato bilan

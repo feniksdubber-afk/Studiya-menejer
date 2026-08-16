@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     r2_public_base_url: str = ""
 
     character_image_max_bytes: int = 5 * 1024 * 1024  # 5 MB
+    voice_cue_screenshot_max_bytes: int = 5 * 1024 * 1024  # 5 MB — video kadr skrinshoti
 
 
 settings = Settings()

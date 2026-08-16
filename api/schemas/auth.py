@@ -29,6 +29,7 @@ class UserOut(BaseModel):
     first_name: str
     last_name: str | None
     telegram_username: str | None
+    phone_number: str | None
     role: str | None
     director_status: str
     is_admin: bool

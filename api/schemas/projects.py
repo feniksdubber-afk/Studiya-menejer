@@ -103,6 +103,11 @@ class EpisodeUpdate(BaseModel):
 class EpisodeOut(BaseModel):
     id: uuid.UUID
     season_id: uuid.UUID
+    # Episode modelida project_id ustuni yo'q (faqat season_id orqali
+    # bog'langan) — frontend VoiceCue/personajlar ro'yxati kabi so'rovlar
+    # uchun qo'shimcha /seasons/{id} chaqirmasin deb, router javob
+    # qaytarishda season.project_id'dan to'ldiradi (qarang: _episode_out).
+    project_id: uuid.UUID
     title: str
     order_index: int
     status: EpisodeStatus

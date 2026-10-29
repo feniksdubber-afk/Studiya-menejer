@@ -212,7 +212,41 @@ async def _build_director_role_requested(db, payload: dict) -> str | None:
     )
 
 
+def _format_timestamp(seconds) -> str:
+    try:
+        total = int(seconds)
+    except (TypeError, ValueError):
+        return ""
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+async def _build_voice_cue_assigned(db, payload: dict) -> str | None:
+    episode_id = payload.get("episode_id")
+    episode = await db.get(Episode, episode_id) if episode_id else None
+    project = None
+    if episode is not None:
+        season = await db.get(Season, episode.season_id)
+        project = await db.get(Project, season.project_id) if season else None
+
+    episode_title = episode.title if episode is not None else payload.get("episode_title", "?")
+    lines = [
+        "🎙 Sizga yangi rol biriktirildi",
+        "",
+        f"🎬 {project.title if project else '?'} — {episode_title}",
+    ]
+    ts = _format_timestamp(payload.get("timestamp_seconds"))
+    if ts:
+        lines.append(f"⏱ Vaqt: {ts}")
+    note = payload.get("director_note")
+    if note:
+        lines.append(f"💬 Rejissyor izohi: {note}")
+    lines.append("")
+    lines.append("Rolni Mini App'da ochib, videoni ko'rib yozing.")
+    return "\n".join(lines)
+
+
 _BUILDERS = {
+    "voice_cue_assigned": _build_voice_cue_assigned,
     "task_assigned": _build_task_assigned,
     "task_submitted": _build_task_submitted,
     "task_revision_requested": _build_task_revision_requested,

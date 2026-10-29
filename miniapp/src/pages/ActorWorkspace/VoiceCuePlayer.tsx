@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import WebApp from "@twa-dev/sdk";
-import { CheckCircle2, ChevronLeft, ChevronRight, PlayCircle, Theater } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, PlayCircle, Theater, Undo2 } from "lucide-react";
 import { getEpisode } from "@/api/projects";
 import { getOriginalVideoPlaybackUrl } from "@/api/originalVideo";
-import { listEpisodeCues, markCueRecorded } from "@/api/voiceCues";
+import { listEpisodeCues, markCueRecorded, markCueUnrecorded } from "@/api/voiceCues";
 import { formatCueTime } from "@/components/VoiceCueCard";
 import { LoadingScreen, QueryError } from "@/components/StatusScreens";
 import { EmptyState } from "@/components/EmptyState";
@@ -64,6 +64,15 @@ export default function ActorWorkspacePage() {
       setIndex((i) => Math.min(i + 1, cues.length - 1));
     },
     onError: () => showError("Belgilab bo'lmadi"),
+  });
+
+  const unmarkRecordedMutation = useMutation({
+    mutationFn: (cueId: string) => markCueUnrecorded(cueId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["episode-cues", episodeId] });
+      WebApp.HapticFeedback.notificationOccurred("warning");
+    },
+    onError: () => showError("Belgini bekor qilib bo'lmadi"),
   });
 
   if (episodeQuery.isLoading || cuesQuery.isLoading || videoQuery.isLoading) {
@@ -169,8 +178,18 @@ export default function ActorWorkspacePage() {
       )}
 
       {cue.status === "recorded" ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-role-sound-50 px-4 py-3 text-sm font-medium text-role-sound-800">
-          <CheckCircle2 size={16} aria-hidden="true" /> Rol bajarildi ✓
+        <div className="flex items-stretch gap-2">
+          <div className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-role-sound-50 px-4 py-3 text-sm font-medium text-role-sound-800">
+            <CheckCircle2 size={16} aria-hidden="true" /> Rol bajarildi ✓
+          </div>
+          <button
+            onClick={() => unmarkRecordedMutation.mutate(cue.id)}
+            disabled={unmarkRecordedMutation.isPending}
+            aria-label="Rol belgisini bekor qilish"
+            className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-tg-secondaryBg px-3 text-sm font-medium text-tg-text active:opacity-70 disabled:opacity-50"
+          >
+            <Undo2 size={15} aria-hidden="true" /> Bekor qilish
+          </button>
         </div>
       ) : (
         <button

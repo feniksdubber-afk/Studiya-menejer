@@ -92,14 +92,21 @@ function UpstreamMaterialSection({
  *  "pending"), shuning uchun bunday holatda hech narsa chizmaydi — xato
  *  yoki bo'sh karta bilan ekranni band qilmaydi. */
 function SubmittedFileSection({ taskId }: { taskId: string }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["task-file", taskId],
     queryFn: () => getTaskSubmittedFile(taskId),
   });
 
   if (isLoading || !data) return null;
 
-  return <TaskFileCard title="Topshirilgan fayl" file={data} accentClassName="bg-role-sound-50 text-role-sound-800" />;
+  return (
+    <TaskFileCard
+      title="Topshirilgan fayl"
+      file={data}
+      accentClassName="bg-role-sound-50 text-role-sound-800"
+      onExpired={() => void refetch()}
+    />
+  );
 }
 
 function RequestRevisionForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {

@@ -96,8 +96,9 @@ class OriginalVideoPlaybackOut(BaseModel):
 # (masalan tarjimon uchun original video, svedeniyachi uchun ovoz fayli)
 # yoki joriy vazifaning o'zi topshirgan faylini Mini App ichida to'g'ridan-
 # to'g'ri ko'rish/eshitish/yuklab olish uchun. Binary hech qachon bizning
-# serverimizda saqlanmaydi — Telegram Bot API `getFile` orqali vaqtinchalik
-# (bir necha soatlik) havola olinadi va shundayligicha frontendga beriladi.
+# serverimizda saqlanmaydi. Fayl backend orqali (`/files/{id}/stream`)
+# Telegram'dan uzatiladi; frontendga faqat imzolangan qisqa umrli havola
+# beriladi — bot tokeni hech qachon chiqmaydi.
 
 
 class TaskFileOut(BaseModel):
@@ -110,7 +111,6 @@ class TaskFileOut(BaseModel):
     version_number: int
     uploaded_by: uuid.UUID
     created_at: datetime
-    # Telegram fayl havolasi — 1 soatgacha amal qiladi (Telegram serverida
-    # shu muddatdan keyin file_path eskiradi, qayta so'rash kerak bo'ladi).
+    # Backend stream havolasi (imzolangan belgi bilan) — 15 daqiqa amal qiladi.
     file_url: str
     expires_in: int

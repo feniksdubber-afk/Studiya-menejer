@@ -21,7 +21,6 @@ export function CueList({
   episodeId,
   allCuesCount,
   activeCueId,
-  currentUserId,
   characters,
   members,
   onSelect,

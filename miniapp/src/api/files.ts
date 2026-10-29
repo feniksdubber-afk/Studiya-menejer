@@ -35,3 +35,9 @@ export async function getUpstreamTaskFile(
     throw err;
   }
 }
+
+// Mini App ichida ochib bo'lmaydigan (20 MB dan katta) faylni botdan
+// foydalanuvchining o'ziga yuboradi.
+export async function sendFileToMe(fileId: string): Promise<void> {
+  await apiClient.post(`/files/${fileId}/send-to-me`);
+}

@@ -85,6 +85,13 @@ export async function markCueRecorded(cueId: string): Promise<VoiceCue> {
   return data;
 }
 
+export async function markCueUnrecorded(cueId: string): Promise<VoiceCue> {
+  const { data } = await apiClient.patch<VoiceCue>(`/voice-cues/${cueId}/status`, {
+    status: "assigned",
+  });
+  return data;
+}
+
 export async function deleteVoiceCue(cueId: string): Promise<void> {
   await apiClient.delete(`/voice-cues/${cueId}`);
 }

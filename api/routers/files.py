@@ -1,6 +1,9 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +24,8 @@ from schemas.files import (
 )
 from services.permissions import get_membership, get_project_or_404, is_project_director, require_project_member
 from services import r2_storage
-from services.telegram_files import FILE_URL_TTL_SECONDS, get_telegram_file_url
+from core.security import create_file_stream_token, decode_file_stream_token
+from services.telegram_files import FILE_URL_TTL_SECONDS, open_telegram_file_stream, send_file_to_chat
 
 router = APIRouter(tags=["files"])
 
@@ -228,8 +232,11 @@ async def _active_file_and_version(db: AsyncSession, task_id: uuid.UUID) -> tupl
     return file, version
 
 
-async def _build_task_file_out(file: File, version: FileVersion) -> TaskFileOut:
-    file_url = await get_telegram_file_url(file.telegram_file_id)
+async def _build_task_file_out(file: File, version: FileVersion, user: User) -> TaskFileOut:
+    # Ruxsat chaqiruvchi endpointda allaqachon tekshirilgan. Bu yerda faqat shu
+    # faylga tegishli qisqa umrli belgi beriladi — bot tokeni hech qachon chiqmaydi.
+    stream_token = create_file_stream_token(file.id, user.id, FILE_URL_TTL_SECONDS)
+    file_url = f"/api/files/{file.id}/stream?t={stream_token}"
     return TaskFileOut(
         file_id=file.id,
         task_id=file.task_id,
@@ -274,7 +281,7 @@ async def get_task_submitted_file(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bu vazifa uchun hali fayl topshirilmagan")
 
     file, version = found
-    return await _build_task_file_out(file, version)
+    return await _build_task_file_out(file, version, user)
 
 
 @router.get("/episodes/{episode_id}/upstream-file", response_model=TaskFileOut)
@@ -322,4 +329,56 @@ async def get_upstream_task_file(
         )
 
     file, version = found
-    return await _build_task_file_out(file, version)
+    return await _build_task_file_out(file, version, user)
+
+
+@router.get("/files/{file_id}/stream")
+async def stream_task_file(
+    file_id: uuid.UUID,
+    request: Request,
+    t: str = Query(..., description="create_file_stream_token orqali berilgan belgi"),
+    download: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """Faylni Telegram'dan backend orqali uzatadi (Range bilan). Autentifikatsiya
+    imzolangan `t` belgisi orqali — <video>/<audio>/<a> header yubora olmaydi."""
+    decode_file_stream_token(t, file_id)
+
+    file = await db.get(File, file_id)
+    if file is None or not file.telegram_file_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+
+    stream = await open_telegram_file_stream(file.telegram_file_id, request.headers.get("range"))
+    headers = dict(stream.headers)
+    if file.mime_type:
+        headers["Content-Type"] = file.mime_type
+    disposition = "attachment" if download else "inline"
+    headers["Content-Disposition"] = f"{disposition}; filename*=UTF-8''{quote(file.current_name)}"
+    headers["Cache-Control"] = "private, max-age=300"
+    return StreamingResponse(stream.body, status_code=stream.status_code, headers=headers)
+
+
+@router.post("/files/{file_id}/send-to-me", status_code=status.HTTP_204_NO_CONTENT)
+async def send_task_file_to_me(
+    file_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_registered_user),
+):
+    """Faylni botdan foydalanuvchining o'ziga yuboradi. Mini App ichida ochib
+    bo'lmaydigan (20 MB dan katta) fayllar uchun. Ruxsat `get_task_submitted_file`
+    bilan bir xil: admin, vazifa ijrochisi yoki loyiha a'zosi."""
+    file = await db.get(File, file_id)
+    if file is None or not file.telegram_file_id or file.task_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+
+    task = await db.get(Task, file.task_id)
+    episode = await db.get(Episode, task.episode_id) if task else None
+    season = await db.get(Season, episode.season_id) if episode else None
+    if season is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+    project = await get_project_or_404(season.project_id, db)
+
+    if not (user.is_admin or user.is_super_admin or task.assigned_to == user.id):
+        await require_project_member(project, user, db)
+
+    await send_file_to_chat(file.telegram_file_id, user.telegram_id, caption=file.current_name)

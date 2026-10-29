@@ -73,6 +73,42 @@ async def _cue_out(db: AsyncSession, cue: VoiceCue) -> VoiceCueOut:
     )
 
 
+async def _cues_out(db: AsyncSession, cues: list[VoiceCue]) -> list[VoiceCueOut]:
+    """Ro'yxat uchun: personaj va aktyorlarni 2 ta so'rovda yuklaydi (N+1 yo'q)."""
+    char_ids = {c.character_id for c in cues if c.character_id is not None}
+    actor_ids = {c.actor_id for c in cues if c.actor_id is not None}
+    characters = {}
+    if char_ids:
+        rows = await db.execute(select(Character).where(Character.id.in_(char_ids)))
+        characters = {c.id: c for c in rows.scalars()}
+    actors = {}
+    if actor_ids:
+        rows = await db.execute(select(User).where(User.id.in_(actor_ids)))
+        actors = {u.id: u for u in rows.scalars()}
+
+    out = []
+    for cue in cues:
+        char_obj = characters.get(cue.character_id) if cue.character_id else None
+        actor_obj = actors.get(cue.actor_id) if cue.actor_id else None
+        out.append(
+            VoiceCueOut(
+                id=cue.id,
+                episode_id=cue.episode_id,
+                timestamp_seconds=cue.timestamp_seconds,
+                screenshot_url=r2_storage.public_url(cue.screenshot_key),
+                character=VoiceCueCharacterBrief.model_validate(char_obj) if char_obj else None,
+                temp_label=cue.temp_label,
+                actor=VoiceCueActorBrief.model_validate(actor_obj) if actor_obj else None,
+                director_note=cue.director_note,
+                status=cue.status,
+                order_index=cue.order_index,
+                created_by=cue.created_by,
+                created_at=cue.created_at,
+            )
+        )
+    return out
+
+
 async def _validate_character_belongs_to_project(
     db: AsyncSession, character_id: uuid.UUID, project_id: uuid.UUID
 ) -> None:
@@ -127,7 +163,7 @@ async def list_episode_cues(
         query = query.where(VoiceCue.created_by == user.id)
 
     result = await db.execute(query.order_by(VoiceCue.timestamp_seconds))
-    return [await _cue_out(db, cue) for cue in result.scalars().all()]
+    return await _cues_out(db, list(result.scalars().all()))
 
 
 @router.get("/voice-cues/mine", response_model=list[VoiceCueOut])
@@ -140,7 +176,7 @@ async def list_my_cues(
     if episode_id is not None:
         query = query.where(VoiceCue.episode_id == episode_id)
     result = await db.execute(query.order_by(VoiceCue.timestamp_seconds))
-    return [await _cue_out(db, cue) for cue in result.scalars().all()]
+    return await _cues_out(db, list(result.scalars().all()))
 
 
 @router.post(
@@ -228,9 +264,13 @@ async def update_voice_cue(
     for field, value in data.items():
         setattr(cue, field, value)
 
-    actor_newly_assigned = "actor_id" in data and data["actor_id"] is not None and data["actor_id"] != old_actor_id
-    if actor_newly_assigned and cue.status == VoiceCueStatus.pending:
-        cue.status = VoiceCueStatus.assigned
+    actor_changed = "actor_id" in data and data["actor_id"] != old_actor_id
+    actor_newly_assigned = actor_changed and data["actor_id"] is not None
+    if actor_changed:
+        # Aktyor o'zgarsa status har doim yangi holatga mos tiklanadi:
+        # aktyor olib tashlansa -> pending; boshqa aktyor biriktirilsa (hatto
+        # oldingisi "recorded" qilgan bo'lsa ham) -> yangi aktyor yozishi kerak.
+        cue.status = VoiceCueStatus.assigned if actor_newly_assigned else VoiceCueStatus.pending
 
     await db.commit()
     await db.refresh(cue)
@@ -248,9 +288,9 @@ async def update_voice_cue_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_registered_user),
 ):
-    """Faqat cue'ga biriktirilgan aktyor (yoki admin) uchun — va faqat
-    assigned -> recorded o'tishi ruxsat etilgan (boshqa hech qanday
-    o'tish routerda ruxsat berilmaydi)."""
+    """Faqat cue'ga biriktirilgan aktyor (yoki admin) uchun — faqat
+    assigned <-> recorded o'tishlariga ruxsat (pending'ga faqat aktyorni
+    olib tashlash orqali tushadi)."""
     cue = await _get_cue_or_404(db, cue_id)
 
     if not (user.is_admin or user.is_super_admin) and cue.actor_id != user.id:
@@ -258,10 +298,14 @@ async def update_voice_cue_status(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Faqat shu rolga biriktirilgan aktyor statusni o'zgartira oladi",
         )
-    if not (cue.status == VoiceCueStatus.assigned and payload.status == VoiceCueStatus.recorded):
+    allowed = {
+        (VoiceCueStatus.assigned, VoiceCueStatus.recorded),  # "Yozib bo'ldim"
+        (VoiceCueStatus.recorded, VoiceCueStatus.assigned),  # belgini bekor qilish
+    }
+    if (cue.status, payload.status) not in allowed:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Faqat 'assigned' holatidan 'recorded' holatiga o'tish mumkin",
+            detail="Faqat 'assigned' <-> 'recorded' o'tishlariga ruxsat berilgan",
         )
 
     cue.status = payload.status

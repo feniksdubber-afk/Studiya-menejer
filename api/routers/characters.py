@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from core.config import settings
 from db.session import get_db
 from models.characters import AniListCharacterRole, Character, CharacterCast, ImageSource
 from models.projects import Project
+from models.voice_cues import VoiceCue
 from models.users import User
 from routers.auth import require_registered_user
 from schemas.characters import (
@@ -164,6 +165,21 @@ async def delete_character(
             status_code=status.HTTP_409_CONFLICT,
             detail="Personajga aktyor biriktirilgan — o'chirish o'rniga faolsizlantiring (is_active=false)",
         )
+
+    # Rollardagi (voice cue) character_id FK `SET NULL` bo'ladi, lekin CHECK
+    # constraint character_id yoki temp_label'dan kamida bittasini talab qiladi.
+    # Shuning uchun o'chirishdan oldin personaj nomini temp_label'ga ko'chiramiz —
+    # rol yo'qolmaydi va 500 xato bermaydi.
+    await db.execute(
+        update(VoiceCue)
+        .where(VoiceCue.character_id == character_id, VoiceCue.temp_label.is_(None))
+        .values(temp_label=character.name)
+    )
+    await db.execute(
+        update(VoiceCue)
+        .where(VoiceCue.character_id == character_id, VoiceCue.temp_label == "")
+        .values(temp_label=character.name)
+    )
     await db.delete(character)
     await db.commit()
 

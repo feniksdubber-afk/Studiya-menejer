@@ -131,6 +131,37 @@ def decode_access_token(token: str) -> dict:
         ) from exc
 
 
+FILE_STREAM_PURPOSE = "file_stream"
+
+
+def create_file_stream_token(file_id: uuid.UUID, user_id: uuid.UUID, ttl_seconds: int) -> str:
+    """<video>/<audio>/<a> Authorization header yubora olmaydi, shuning uchun
+    ruxsat tekshiruvidan o'tgan foydalanuvchiga aynan bitta faylga tegishli,
+    qisqa umrli imzolangan belgi beriladi (bot tokeni emas)."""
+    now = int(time.time())
+    payload = {
+        "purpose": FILE_STREAM_PURPOSE,
+        "fid": str(file_id),
+        "sub": str(user_id),
+        "iat": now,
+        "exp": now + ttl_seconds,
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_file_stream_token(token: str, file_id: uuid.UUID) -> dict:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Havola yaroqsiz yoki muddati o'tgan — sahifani yangilang",
+        ) from exc
+    if payload.get("purpose") != FILE_STREAM_PURPOSE or payload.get("fid") != str(file_id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Havola bu fayl uchun emas")
+    return payload
+
+
 def get_bearer_token(authorization: str = Header(default=None)) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
